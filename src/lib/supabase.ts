@@ -121,7 +121,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
     const userMap = users.reduce((acc, user) => {
       acc[user.id] = user;
       return acc;
-    }, {} as Record<number, User>);
+    }, {} as Record<number, any>);
 
     // Determine the winner
     const team1Won = matchData.team1Score > matchData.team2Score;
@@ -307,4 +307,213 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
     console.error('Error saving match:', error);
     return { success: false, error };
   }
+}
+
+// Function to get a player's match history
+export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
+  // First get all the teams the player was part of
+  const { data: teamPlayers, error: teamPlayersError } = await supabase
+    .from('TeamPlayer')
+    .select('id, team_id, old_elo, new_elo, scored, conceded, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (teamPlayersError || !teamPlayers) {
+    console.error('Error fetching team players:', teamPlayersError);
+    return [];
+  }
+
+  // If there are no matches, return empty array
+  if (teamPlayers.length === 0) {
+    return [];
+  }
+
+  // Get the teams
+  const teamIds = teamPlayers.map(tp => tp.team_id);
+  const { data: teams, error: teamsError } = await supabase
+    .from('Team')
+    .select('id, match_id, color')
+    .in('id', teamIds);
+
+  if (teamsError || !teams) {
+    console.error('Error fetching teams:', teamsError);
+    return [];
+  }
+
+  // Create a lookup for teams
+  const teamMap = teams.reduce((acc, team) => {
+    acc[team.id] = team;
+    return acc;
+  }, {} as Record<number, any>);
+
+  // Get the matches
+  const matchIds = teams.map(team => team.match_id);
+  const { data: matches, error: matchesError } = await supabase
+    .from('Match')
+    .select('id, team_white_score, team_blue_score, created_at')
+    .in('id', matchIds);
+
+  if (matchesError || !matches) {
+    console.error('Error fetching matches:', matchesError);
+    return [];
+  }
+
+  // Create a lookup for matches
+  const matchMap = matches.reduce((acc, match) => {
+    acc[match.id] = match;
+    return acc;
+  }, {} as Record<number, any>);
+
+  // For each team the player was on, get the opposing team
+  const processedMatches = [];
+  for (const teamPlayer of teamPlayers) {
+    const team = teamMap[teamPlayer.team_id];
+    if (!team) continue;
+
+    const match = matchMap[team.match_id];
+    if (!match) continue;
+
+    // Get the opposing team
+    const { data: opposingTeam, error: opposingTeamError } = await supabase
+      .from('Team')
+      .select('id')
+      .eq('match_id', team.match_id)
+      .neq('id', team.id)
+      .single();
+
+    if (opposingTeamError || !opposingTeam) {
+      console.error('Error fetching opposing team:', opposingTeamError);
+      continue;
+    }
+
+    // Get the opposing team players
+    const { data: opposingTeamPlayers, error: opposingTeamPlayersError } = await supabase
+      .from('TeamPlayer')
+      .select('user_id')
+      .eq('team_id', opposingTeam.id);
+
+    if (opposingTeamPlayersError || !opposingTeamPlayers) {
+      console.error('Error fetching opposing team players:', opposingTeamPlayersError);
+      continue;
+    }
+
+    // Get the opposing players' names
+    const opposingPlayerIds = opposingTeamPlayers.map(tp => tp.user_id);
+    const { data: opposingUsers, error: opposingUsersError } = await supabase
+      .from('User')
+      .select('id, name')
+      .in('id', opposingPlayerIds);
+
+    if (opposingUsersError || !opposingUsers) {
+      console.error('Error fetching opposing users:', opposingUsersError);
+      continue;
+    }
+
+    // Determine if the player's team won
+    const isWhiteTeam = team.color === TeamColor.WHITE;
+    const whiteScore = match.team_white_score;
+    const blueScore = match.team_blue_score;
+    const playerTeamScore = isWhiteTeam ? whiteScore : blueScore;
+    const opposingTeamScore = isWhiteTeam ? blueScore : whiteScore;
+    const result = playerTeamScore > opposingTeamScore ? 'Win' : (playerTeamScore < opposingTeamScore ? 'Loss' : 'Draw');
+
+    // Calculate ELO change
+    const eloChange = teamPlayer.new_elo - teamPlayer.old_elo;
+
+    // Format the opposing team's name
+    const opposingTeamName = `Team ${opposingUsers.map(u => u.name.split(' ')[0]).join(' & ')}`;
+
+    // Format the date
+    const date = new Date(match.created_at);
+    const formattedDate = date.toLocaleDateString('en-US', { 
+      month: 'short',
+      day: 'numeric'
+    });
+
+    processedMatches.push({
+      date: formattedDate,
+      fullDate: match.created_at,
+      opponent: opposingTeamName,
+      result,
+      score: `${playerTeamScore}-${opposingTeamScore}`,
+      ratingChange: eloChange > 0 ? `+${eloChange}` : `${eloChange}`,
+      elo: teamPlayer.new_elo
+    });
+  }
+
+  return processedMatches;
+}
+
+// Function to get a player's ELO rating history
+export async function getPlayerEloHistory(userId: number): Promise<any[]> {
+  const { data: teamPlayers, error } = await supabase
+    .from('TeamPlayer')
+    .select('new_elo, created_at')
+    .eq('user_id', userId)
+    .order('created_at');
+
+  if (error || !teamPlayers) {
+    console.error('Error fetching ELO history:', error);
+    return [];
+  }
+
+  // Get the initial ELO from the user table
+  const { data: user, error: userError } = await supabase
+    .from('User')
+    .select('elo_score')
+    .eq('id', userId)
+    .single();
+
+  if (userError || !user) {
+    console.error('Error fetching user ELO:', userError);
+    return [];
+  }
+
+  // If there are no matches, return only the current ELO
+  if (teamPlayers.length === 0) {
+    const currentDate = new Date();
+    const formattedDate = currentDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+    return [{
+      date: formattedDate,
+      rating: user.elo_score
+    }];
+  }
+
+  // Process the data to create the history
+  const eloHistory = teamPlayers.map(tp => {
+    const date = new Date(tp.created_at);
+    const formattedDate = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+    
+    return {
+      date: formattedDate,
+      fullDate: tp.created_at,
+      rating: tp.new_elo
+    };
+  });
+
+  // Add the current ELO as the latest entry
+  const latestMatch = new Date(teamPlayers[teamPlayers.length - 1].created_at);
+  const currentDate = new Date();
+  
+  // Only add current ELO if it's been at least a day since the last match
+  if ((currentDate.getTime() - latestMatch.getTime()) > (24 * 60 * 60 * 1000)) {
+    const formattedCurrentDate = currentDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+    
+    eloHistory.push({
+      date: formattedCurrentDate,
+      fullDate: currentDate.toISOString(),
+      rating: user.elo_score
+    });
+  }
+
+  return eloHistory;
 }
