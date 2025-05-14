@@ -5,6 +5,7 @@ import { MatchOdds } from './components/MatchOdds';
 import { History } from './components/History';
 import { OptimalTeams } from './components/OptimalTeams';
 import { Players } from './components/Players';
+import { AddPlayer } from './components/AddPlayer';
 
 interface FormData {
   player1: string;
@@ -34,6 +35,8 @@ function App() {
         return <OptimalTeams />;
       case 'Players':
         return <Players />;
+      case 'AddPlayer':
+        return <AddPlayer />;
       default:
         return <EnterScore onSubmit={handleSubmit} />;
     }

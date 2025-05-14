@@ -61,7 +61,8 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
     { name: 'MatchOdds', label: 'Match Odds' },
     { name: 'History', label: 'History' },
     { name: 'OptimalTeams', label: 'Optimal Teams' },
-    { name: 'Players', label: 'Players' }
+    { name: 'Players', label: 'Players' },
+    { name: 'AddPlayer', label: 'Add Player' }
   ];
 
   return (

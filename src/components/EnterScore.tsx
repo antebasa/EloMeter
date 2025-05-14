@@ -1,4 +1,4 @@
-import { 
+import {
   Box,
   Button,
   Flex,
@@ -43,9 +43,6 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
   useEffect(() => {
     async function loadUsers() {
       try {
-        // Try to insert sample users first (this will only insert if table is empty)
-        await insertSampleUsers();
-        // Then fetch all users
         const fetchedUsers = await getUsers();
         setUsers(fetchedUsers);
       } catch (error) {
@@ -100,7 +97,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
                 ))}
               </Select>
             </FormControl>
-            
+
             <FormControl isRequired>
               <FormLabel>Player 2</FormLabel>
               <Select
@@ -136,7 +133,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
                 ))}
               </Select>
             </FormControl>
-            
+
             <FormControl isRequired>
               <FormLabel>Player 4</FormLabel>
               <Select
@@ -167,8 +164,8 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
           </FormControl>
 
           <Flex justify="flex-end">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               colorScheme="blue"
               isLoading={loading}
               isDisabled={loading || !formData.player1 || !formData.player2 || !formData.player3 || !formData.player4 || !formData.score}
@@ -180,4 +177,4 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
       </Box>
     </Box>
   );
-}; 
+};

@@ -8,7 +8,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface User {
   id: number;
   name: string;
-  email: string;
+  scored: number;
+  conceded: number;
+  elo_score: number;
+  wins: number;
+  losses: number;
+  played: number;
   created_at: string;
 }
 
@@ -42,7 +47,7 @@ export async function insertSampleUsers() {
 // Function to get all users
 export async function getUsers(): Promise<User[]> {
   const { data, error } = await supabase
-    .from('users')
+    .from('User')
     .select('*')
     .order('name');
 
@@ -52,4 +57,4 @@ export async function getUsers(): Promise<User[]> {
   }
 
   return data || [];
-} 
+}
