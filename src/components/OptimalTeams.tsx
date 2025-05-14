@@ -37,7 +37,21 @@ const generateBalancedTeams = (selectedPlayers: PlayerWithSkills[]) => {
   if (selectedPlayers.length < 4) return null;
 
   const calculateTeamRating = (players: PlayerWithSkills[]) => {
-    return players.reduce((total, player) => total + (player.elo_score || 1500), 0) / players.length;
+    // Calculate weighted average of offense and defense skills
+    const team = {
+      defense: players[0],
+      offense: players[1]
+    };
+    
+    // Use the defense_elo for the defender and offense_elo for the attacker
+    const defenderElo = team.defense.defense_elo || 1500;
+    const attackerElo = team.offense.offense_elo || 1500;
+    
+    // Weight the offense ELO more (60%) than defense (40%)
+    const offenseWeight = 0.6;
+    const defenseWeight = 0.4;
+    
+    return (attackerElo * offenseWeight) + (defenderElo * defenseWeight);
   };
 
   // Try all possible combinations of 2 teams of 2 players each
@@ -102,68 +116,19 @@ const calculatePlayerSkills = (player: User): PlayerWithSkills => {
   const gamesPlayed = player.played || 0;
   const experienceFactor = Math.min(gamesPlayed / 10, 1); // Max experience factor is 1
 
-  // Base values start at 5 (average)
-  let defenseSkill = 5;
-  let offenseSkill = 5;
-
-  // If we have actual stats, use them to calculate skill levels
-  if (player.elo_score && player.wins !== undefined && player.losses !== undefined) {
-    // Defense skill - players who concede fewer goals are better at defense
-    const totalGames = player.played || 0;
-    const goalsScored = player.goals || 0;
-    const goalsConceded = player.conceded || 0;
-    
-    // Avg goals conceded per game - lower is better for defense
-    const avgConceded = totalGames > 0 ? goalsConceded / totalGames : 0;
-    
-    // Avg goals scored per game - higher is better for offense
-    const avgScored = totalGames > 0 ? goalsScored / totalGames : 0;
-    
-    // Win ratio affects both offense and defense
-    const winRatio = totalGames > 0 ? (player.wins / totalGames) : 0;
-    
-    // ELO rating relative to base 1500 affects both skills
-    const eloModifier = player.elo_score > 1500 ? 
-      (player.elo_score - 1500) / 200 : // Positive modifier
-      (player.elo_score - 1500) / 300;  // Negative modifier (less impact)
-    
-    // Calculate defense skill (scale 1-10)
-    defenseSkill = 5; // Base value
-    
-    // Lower conceded goals improves defense skill
-    defenseSkill += totalGames > 0 ? (1 - Math.min(avgConceded / 5, 1)) * 2 : 0;
-    
-    // Win ratio improves skill
-    defenseSkill += winRatio * 2;
-    
-    // ELO rating adjustment
-    defenseSkill += eloModifier;
-    
-    // Calculate offense skill (scale 1-10)
-    offenseSkill = 5; // Base value
-    
-    // Higher scored goals improves offense skill
-    offenseSkill += Math.min(avgScored, 3) / 3 * 3;
-    
-    // Win ratio improves skill
-    offenseSkill += winRatio * 2;
-    
-    // ELO rating adjustment
-    offenseSkill += eloModifier;
-  }
+  // Use the actual ELO values directly
+  const defenseElo = player.defense_elo || 1500;
+  const offenseElo = player.offense_elo || 1500;
   
-  // Apply experience factor - more experienced players have more reliable skill ratings
-  defenseSkill = 5 + (defenseSkill - 5) * experienceFactor;
-  offenseSkill = 5 + (offenseSkill - 5) * experienceFactor;
-  
-  // Ensure skills stay in range 1-10
-  defenseSkill = Math.max(1, Math.min(10, Math.round(defenseSkill * 10) / 10));
-  offenseSkill = Math.max(1, Math.min(10, Math.round(offenseSkill * 10) / 10));
+  // Scale ELO to 1-10 skill range
+  // Assuming 1300-1700 as the typical ELO range, map to 1-10
+  const defenseSkill = Math.max(1, Math.min(10, (defenseElo - 1300) / 400 * 9 + 1));
+  const offenseSkill = Math.max(1, Math.min(10, (offenseElo - 1300) / 400 * 9 + 1));
 
   return {
     ...player,
-    defenseSkill,
-    offenseSkill
+    defenseSkill: Math.round(defenseSkill * 10) / 10, // Round to 1 decimal place
+    offenseSkill: Math.round(offenseSkill * 10) / 10  // Round to 1 decimal place
   };
 };
 
@@ -266,7 +231,8 @@ export const OptimalTeams = () => {
                   >
                     <HStack>
                       <Text>{player.name}</Text>
-                      <Badge colorScheme="purple">{player.elo_score || 1500}</Badge>
+                      <Badge colorScheme="green" mr={1}>O: {player.offense_elo || 1500}</Badge>
+                      <Badge colorScheme="blue">D: {player.defense_elo || 1500}</Badge>
                     </HStack>
                   </Checkbox>
                 ))}

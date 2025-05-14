@@ -34,6 +34,16 @@ const calculateWinProbability = (team1Rating: number, team2Rating: number): numb
   return 1 / (1 + Math.pow(10, (team2Rating - team1Rating) / 400));
 };
 
+// Calculate team strength with weighted offense/defense ELO
+const calculateTeamStrength = (
+  defenseElo: number, 
+  offenseElo: number, 
+  offenseWeight: number = 0.6
+): number => {
+  const defenseWeight = 1 - offenseWeight;
+  return Math.round((offenseElo * offenseWeight) + (defenseElo * defenseWeight));
+};
+
 export const MatchOdds = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,14 +99,14 @@ export const MatchOdds = () => {
       const team2OffensePlayer = users.find(user => user.id === team2OffenseId);
 
       // Get ELO ratings (default to 1500 if not found)
-      const team1DefenseRating = team1DefensePlayer?.elo_score || 1500;
-      const team1OffenseRating = team1OffensePlayer?.elo_score || 1500;
-      const team2DefenseRating = team2DefensePlayer?.elo_score || 1500;
-      const team2OffenseRating = team2OffensePlayer?.elo_score || 1500;
+      const team1DefenseElo = team1DefensePlayer?.defense_elo || 1500;
+      const team1OffenseElo = team1OffensePlayer?.offense_elo || 1500;
+      const team2DefenseElo = team2DefensePlayer?.defense_elo || 1500;
+      const team2OffenseElo = team2OffensePlayer?.offense_elo || 1500;
 
-      // Calculate team ratings (average)
-      const team1Rating = (team1DefenseRating + team1OffenseRating) / 2;
-      const team2Rating = (team2DefenseRating + team2OffenseRating) / 2;
+      // Calculate team ratings with position-specific ELO weighting
+      const team1Rating = calculateTeamStrength(team1DefenseElo, team1OffenseElo);
+      const team2Rating = calculateTeamStrength(team2DefenseElo, team2OffenseElo);
 
       // Calculate win probability
       const team1WinProbability = calculateWinProbability(team1Rating, team2Rating);
@@ -148,7 +158,8 @@ export const MatchOdds = () => {
 
     return {
       name: player.name,
-      elo: player.elo_score || 1500,
+      offenseElo: player.offense_elo || 1500,
+      defenseElo: player.defense_elo || 1500,
       wins: player.wins || 0,
       losses: player.losses || 0,
       played: player.played || 0,
@@ -189,7 +200,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team1Defense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (ELO: {user.elo_score || 1500})
+                        {user.name} (DEF: {user.defense_elo || 1500})
                       </option>
                     ))}
                   </Select>
@@ -205,7 +216,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team1Offense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (ELO: {user.elo_score || 1500})
+                        {user.name} (OFF: {user.offense_elo || 1500})
                       </option>
                     ))}
                   </Select>
@@ -225,7 +236,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team2Defense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (ELO: {user.elo_score || 1500})
+                        {user.name} (DEF: {user.defense_elo || 1500})
                       </option>
                     ))}
                   </Select>
@@ -241,7 +252,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team2Offense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (ELO: {user.elo_score || 1500})
+                        {user.name} (OFF: {user.offense_elo || 1500})
                       </option>
                     ))}
                   </Select>
@@ -302,6 +313,7 @@ export const MatchOdds = () => {
                       <Thead>
                         <Tr>
                           <Th>Player</Th>
+                          <Th isNumeric>Position</Th>
                           <Th isNumeric>ELO</Th>
                           <Th isNumeric>Win %</Th>
                         </Tr>
@@ -311,10 +323,13 @@ export const MatchOdds = () => {
                           const playerStats = getPlayerStats(playerId);
                           if (!playerStats) return null;
                           
+                          const isDefense = idx === 0;
+                          
                           return (
                             <Tr key={`team1-player-${idx}`}>
                               <Td>{playerStats.name}</Td>
-                              <Td isNumeric>{playerStats.elo}</Td>
+                              <Td isNumeric>{isDefense ? 'Defense' : 'Offense'}</Td>
+                              <Td isNumeric>{isDefense ? playerStats.defenseElo : playerStats.offenseElo}</Td>
                               <Td isNumeric>{playerStats.winRate}%</Td>
                             </Tr>
                           );
@@ -329,6 +344,7 @@ export const MatchOdds = () => {
                       <Thead>
                         <Tr>
                           <Th>Player</Th>
+                          <Th isNumeric>Position</Th>
                           <Th isNumeric>ELO</Th>
                           <Th isNumeric>Win %</Th>
                         </Tr>
@@ -338,10 +354,13 @@ export const MatchOdds = () => {
                           const playerStats = getPlayerStats(playerId);
                           if (!playerStats) return null;
                           
+                          const isDefense = idx === 0;
+                          
                           return (
                             <Tr key={`team2-player-${idx}`}>
                               <Td>{playerStats.name}</Td>
-                              <Td isNumeric>{playerStats.elo}</Td>
+                              <Td isNumeric>{isDefense ? 'Defense' : 'Offense'}</Td>
+                              <Td isNumeric>{isDefense ? playerStats.defenseElo : playerStats.offenseElo}</Td>
                               <Td isNumeric>{playerStats.winRate}%</Td>
                             </Tr>
                           );

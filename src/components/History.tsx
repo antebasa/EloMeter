@@ -15,9 +15,17 @@ import {
   AlertTitle,
   AlertDescription,
   Skeleton,
-  SkeletonText
+  SkeletonText,
+  Tabs, 
+  TabList, 
+  TabPanels, 
+  Tab, 
+  TabPanel,
+  Switch,
+  FormControl,
+  FormLabel
 } from "@chakra-ui/react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { getUsers, getPlayerMatchHistory, getPlayerEloHistory } from "../lib/supabase";
 import type { User } from "../lib/supabase";
 
@@ -29,6 +37,7 @@ export const History = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPlayerData, setCurrentPlayerData] = useState<User | null>(null);
+  const [showBothElos, setShowBothElos] = useState<boolean>(true);
   
   useEffect(() => {
     // Load the users when the component mounts
@@ -83,16 +92,43 @@ export const History = () => {
     loadPlayerData();
   }, [selectedPlayer]);
 
-  // Format the chart data
-  const chartData = eloHistory.map(item => ({
-    name: item.date,
-    ELO: item.rating
-  }));
+  // Format the chart data - group by date and separate offense/defense
+  const chartData = eloHistory.reduce((acc: any[], item: any) => {
+    // Check if there's already an entry for this date
+    const existingEntry = acc.find(entry => entry.name === item.date);
+    
+    if (existingEntry) {
+      // Update existing entry with this type of ELO
+      if (item.type === 'offense') {
+        existingEntry.offenseELO = item.rating;
+      } else if (item.type === 'defense') {
+        existingEntry.defenseELO = item.rating;
+      }
+    } else {
+      // Create a new entry for this date
+      const newEntry: any = { name: item.date };
+      if (item.type === 'offense') {
+        newEntry.offenseELO = item.rating;
+      } else if (item.type === 'defense') {
+        newEntry.defenseELO = item.rating;
+      }
+      acc.push(newEntry);
+    }
+    
+    return acc;
+  }, []);
 
   // Make sure there's a consistent y-axis range for the chart
-  const chartYDomain = eloHistory.length > 0 
-    ? [(Math.min(...eloHistory.map(item => item.rating)) - 50), (Math.max(...eloHistory.map(item => item.rating)) + 50)]
-    : [1450, 1550]; // Default range if no data
+  let minValue = 1450;
+  let maxValue = 1550;
+  
+  if (eloHistory.length > 0) {
+    const allRatings = eloHistory.map(item => item.rating);
+    minValue = Math.min(...allRatings) - 50;
+    maxValue = Math.max(...allRatings) + 50;
+  }
+  
+  const chartYDomain = [minValue, maxValue];
 
   // Handler for player selection change
   const handlePlayerChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -106,8 +142,12 @@ export const History = () => {
     losses: currentPlayerData?.losses || 0,
     goals: currentPlayerData?.goals || 0,
     conceded: currentPlayerData?.conceded || 0,
-    elo_score: currentPlayerData?.elo_score || 1500
+    elo_offense: currentPlayerData?.elo_offense || 1500,
+    elo_defense: currentPlayerData?.elo_defense || 1500
   };
+
+  // Calculate combined ELO (weighted average)
+  const combinedElo = Math.round((playerStats.elo_offense * 0.6) + (playerStats.elo_defense * 0.4));
 
   return (
     <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
@@ -143,13 +183,27 @@ export const History = () => {
               {playerStats.played} matches played ({playerStats.wins} wins, {playerStats.losses} losses)
             </Text>
           </Box>
-          <Box textAlign="center">
-            <Heading as="h4" size="md" color="gray.600">Current ELO</Heading>
-            <Text fontSize="2xl" fontWeight="bold" color="blue.600">
-              {playerStats.elo_score}
-            </Text>
-          </Box>
-          <Box textAlign="center">
+          <Flex direction={{ base: "row", md: "row" }} justify="space-around" flex="1">
+            <Box textAlign="center">
+              <Heading as="h4" size="md" color="gray.600">Offense ELO</Heading>
+              <Text fontSize="2xl" fontWeight="bold" color="purple.600">
+                {playerStats.elo_offense}
+              </Text>
+            </Box>
+            <Box textAlign="center">
+              <Heading as="h4" size="md" color="gray.600">Defense ELO</Heading>
+              <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+                {playerStats.elo_defense}
+              </Text>
+            </Box>
+            <Box textAlign="center">
+              <Heading as="h4" size="md" color="gray.600">Combined</Heading>
+              <Text fontSize="2xl" fontWeight="bold" color="teal.600">
+                {combinedElo}
+              </Text>
+            </Box>
+          </Flex>
+          <Box textAlign="center" ml={{ base: 0, md: 4 }}>
             <Text fontWeight="bold">Goals</Text>
             <HStack spacing={4} justify="center">
               <Box>
@@ -191,7 +245,21 @@ export const History = () => {
       ) : (
         <>
           <Box mb={8}>
-            <Heading as="h3" size="md" mb={4}>ELO Rating History</Heading>
+            <Flex justify="space-between" align="center" mb={2}>
+              <Heading as="h3" size="md">ELO Rating History</Heading>
+              <FormControl display="flex" alignItems="center" width="auto">
+                <FormLabel htmlFor="show-both-elos" mb="0" fontSize="sm">
+                  Show both ELOs
+                </FormLabel>
+                <Switch 
+                  id="show-both-elos" 
+                  isChecked={showBothElos} 
+                  onChange={() => setShowBothElos(!showBothElos)}
+                  colorScheme="purple"
+                />
+              </FormControl>
+            </Flex>
+            
             {eloHistory.length === 0 ? (
               <Alert status="info" borderRadius="md">
                 <AlertIcon />
@@ -214,14 +282,31 @@ export const History = () => {
                         color: "white" 
                       }} 
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="ELO" 
-                      stroke="#3182CE" 
-                      strokeWidth={3}
-                      dot={{ r: 6 }}
-                      activeDot={{ r: 8 }}
-                    />
+                    <Legend />
+                    
+                    {(showBothElos || !showBothElos) && (
+                      <Line 
+                        type="monotone" 
+                        dataKey="offenseELO" 
+                        name="Offense ELO"
+                        stroke="#8884d8" 
+                        strokeWidth={3}
+                        dot={{ r: 6 }}
+                        activeDot={{ r: 8 }}
+                      />
+                    )}
+                    
+                    {(showBothElos || !showBothElos) && (
+                      <Line 
+                        type="monotone" 
+                        dataKey="defenseELO" 
+                        name="Defense ELO"
+                        stroke="#3182CE" 
+                        strokeWidth={3}
+                        dot={{ r: 6 }}
+                        activeDot={{ r: 8 }}
+                      />
+                    )}
                   </LineChart>
                 </ResponsiveContainer>
               </Box>
@@ -248,20 +333,21 @@ export const History = () => {
                     align="center"
                   >
                     <VStack align="flex-start" spacing={0}>
-                      <Text fontWeight="bold">{match.opponent}</Text>
+                      <Text fontWeight="medium">{match.opponent}</Text>
                       <Text fontSize="sm" color="gray.600">{match.date}</Text>
                     </VStack>
                     
                     <HStack>
-                      <Text>{match.score}</Text>
-                      <Badge colorScheme={match.result === "Win" ? "green" : "red"}>
+                      <Badge colorScheme={match.result === "Win" ? "green" : match.result === "Draw" ? "gray" : "red"}>
                         {match.result}
                       </Badge>
-                      <Tag 
-                        colorScheme={match.ratingChange.startsWith('+') ? "green" : "red"}
+                      <Text fontWeight="medium">{match.score}</Text>
+                      <Text 
+                        color={match.ratingChange.startsWith('+') ? "green.500" : "red.500"} 
+                        fontWeight="bold"
                       >
                         {match.ratingChange}
-                      </Tag>
+                      </Text>
                     </HStack>
                   </Flex>
                 ))}

@@ -20,7 +20,8 @@ import {
   useColorModeValue,
   Avatar,
   Alert,
-  AlertIcon
+  AlertIcon,
+  Tooltip
 } from "@chakra-ui/react";
 import { getUsers, getPlayerMatchHistory } from "../lib/supabase";
 import type { User } from "../lib/supabase";
@@ -29,7 +30,18 @@ import type { User } from "../lib/supabase";
 interface PlayerWithStats extends User {
   winPercentage: number;
   recentForm: ('W' | 'L' | 'D')[];
+  combinedElo: number; // Combined ELO for sorting and display
 }
+
+// Calculate a combined ELO score with weighted offense/defense
+const calculateCombinedElo = (
+  offenseElo: number = 1500, 
+  defenseElo: number = 1500, 
+  offenseWeight: number = 0.6
+): number => {
+  const defenseWeight = 1 - offenseWeight;
+  return Math.round((offenseElo * offenseWeight) + (defenseElo * defenseWeight));
+};
 
 export const Players = () => {
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
@@ -40,7 +52,7 @@ export const Players = () => {
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerWithStats;
     direction: 'ascending' | 'descending';
-  }>({ key: 'elo_score', direction: 'descending' });
+  }>({ key: 'combinedElo', direction: 'descending' });
 
   useEffect(() => {
     async function loadUsers() {
@@ -48,10 +60,15 @@ export const Players = () => {
         setLoading(true);
         const fetchedUsers = await getUsers();
         
-        // Process each user to get their recent form
+        // Process each user to get their recent form and calculate combined ELO
         const playersWithRecentForm = await Promise.all(
           fetchedUsers.map(async (user) => {
-            if (!user.id) return { ...user, winPercentage: 0, recentForm: [] };
+            if (!user.id) return { 
+              ...user, 
+              winPercentage: 0, 
+              recentForm: [],
+              combinedElo: 1500
+            };
             
             try {
               // Get match history for the player
@@ -68,25 +85,32 @@ export const Players = () => {
                 match.result === 'Win' ? 'W' : match.result === 'Draw' ? 'D' : 'L'
               ) as ('W' | 'L' | 'D')[];
               
+              // Calculate combined ELO score
+              const offenseElo = user.elo_offense || 1500;
+              const defenseElo = user.elo_defense || 1500;
+              const combinedElo = calculateCombinedElo(offenseElo, defenseElo);
+              
               return {
                 ...user,
                 winPercentage,
-                recentForm
+                recentForm,
+                combinedElo
               };
             } catch (error) {
               console.error(`Error fetching data for player ${user.id}:`, error);
               return {
                 ...user,
                 winPercentage: 0,
-                recentForm: []
+                recentForm: [],
+                combinedElo: calculateCombinedElo(user.elo_offense, user.elo_defense)
               };
             }
           })
         );
         
-        // Sort initially by ELO score descending
+        // Sort initially by combined ELO score descending
         const sortedPlayers = [...playersWithRecentForm].sort((a, b) => 
-          (b.elo_score || 0) - (a.elo_score || 0)
+          (b.combinedElo || 0) - (a.combinedElo || 0)
         );
         
         setPlayers(sortedPlayers);
@@ -174,6 +198,28 @@ export const Players = () => {
     );
   };
 
+  const renderEloRatings = (player: PlayerWithStats) => {
+    const offenseElo = player.elo_offense || 1500;
+    const defenseElo = player.elo_defense || 1500;
+    const combinedElo = player.combinedElo;
+    
+    return (
+      <Tooltip 
+        label={`Combined: ${combinedElo} (60% offense, 40% defense)`} 
+        placement="top"
+      >
+        <HStack spacing={2}>
+          <Badge colorScheme="purple" fontSize="md">
+            {combinedElo}
+          </Badge>
+          <Text fontSize="xs" color="gray.500">
+            (O: {offenseElo} / D: {defenseElo})
+          </Text>
+        </HStack>
+      </Tooltip>
+    );
+  };
+
   return (
     <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
       <Heading as="h2" size="lg" mb={6}>Player Rankings</Heading>
@@ -207,17 +253,17 @@ export const Players = () => {
               <Tr>
                 <Th>#</Th>
                 <Th>Player</Th>
-                <Th onClick={() => handleSort('elo_score')} cursor="pointer">
-                  ELO Rating {renderSortIcon('elo_score')}
+                <Th onClick={() => handleSort('combinedElo')} cursor="pointer">
+                  ELO Rating {renderSortIcon('combinedElo')}
+                </Th>
+                <Th onClick={() => handleSort('elo_offense')} cursor="pointer">
+                  Offense {renderSortIcon('elo_offense')}
+                </Th>
+                <Th onClick={() => handleSort('elo_defense')} cursor="pointer">
+                  Defense {renderSortIcon('elo_defense')}
                 </Th>
                 <Th onClick={() => handleSort('played')} cursor="pointer">
                   Games {renderSortIcon('played')}
-                </Th>
-                <Th onClick={() => handleSort('wins')} cursor="pointer">
-                  Wins {renderSortIcon('wins')}
-                </Th>
-                <Th onClick={() => handleSort('losses')} cursor="pointer">
-                  Losses {renderSortIcon('losses')}
                 </Th>
                 <Th onClick={() => handleSort('winPercentage')} cursor="pointer">
                   Win % {renderSortIcon('winPercentage')}
@@ -236,13 +282,15 @@ export const Players = () => {
                     </HStack>
                   </Td>
                   <Td>
-                    <Badge colorScheme="purple" fontSize="md">
-                      {player.elo_score || 1500}
-                    </Badge>
+                    {renderEloRatings(player)}
+                  </Td>
+                  <Td>
+                    <Badge colorScheme="green">{player.elo_offense || 1500}</Badge>
+                  </Td>
+                  <Td>
+                    <Badge colorScheme="blue">{player.elo_defense || 1500}</Badge>
                   </Td>
                   <Td>{player.played || 0}</Td>
-                  <Td>{player.wins || 0}</Td>
-                  <Td>{player.losses || 0}</Td>
                   <Td>
                     <Badge colorScheme={player.winPercentage >= 50 ? 'green' : 'orange'}>
                       {player.winPercentage}%

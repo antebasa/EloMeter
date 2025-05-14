@@ -38,7 +38,8 @@ export const AddPlayer = () => {
       // Prepare the player data
       const playerData: any = { 
         name,
-        elo_score: 1500, // Default ELO score
+        offense_elo: 1500, // Default offense ELO score
+        defense_elo: 1500, // Default defense ELO score
         played: 0,
         wins: 0,
         losses: 0,
