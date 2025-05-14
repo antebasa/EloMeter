@@ -94,6 +94,8 @@ export const History = () => {
 
   // Format the chart data - group by date and separate offense/defense
   const chartData = eloHistory.reduce((acc: any[], item: any) => {
+    console.log('Processing ELO history item:', item);
+    
     // Check if there's already an entry for this date
     const existingEntry = acc.find(entry => entry.name === item.date);
     
@@ -117,6 +119,8 @@ export const History = () => {
     
     return acc;
   }, []);
+  
+  console.log('Final chart data:', chartData);
 
   // Make sure there's a consistent y-axis range for the chart
   let minValue = 1450;
@@ -284,7 +288,7 @@ export const History = () => {
                     />
                     <Legend />
                     
-                    {(showBothElos || !showBothElos) && (
+                    {(showBothElos || true) && (
                       <Line 
                         type="monotone" 
                         dataKey="offenseELO" 
@@ -296,7 +300,7 @@ export const History = () => {
                       />
                     )}
                     
-                    {(showBothElos || !showBothElos) && (
+                    {(showBothElos || true) && (
                       <Line 
                         type="monotone" 
                         dataKey="defenseELO" 
