@@ -21,24 +21,13 @@ import {
   Divider,
   Flex,
   HStack,
-  VStack
+  VStack,
+  Alert,
+  AlertIcon,
+  Spinner
 } from "@chakra-ui/react";
 import { getUsers } from "../lib/supabase";
 import type { User } from "../lib/supabase";
-
-// Mock player ratings with string keys
-const PLAYER_RATINGS: Record<string, { rating: number, games: number }> = {
-  "1": { rating: 1450, games: 45 },
-  "2": { rating: 1485, games: 37 },
-  "3": { rating: 1418, games: 28 },
-  "4": { rating: 1372, games: 31 },
-  "5": { rating: 1520, games: 40 },
-  "6": { rating: 1395, games: 25 },
-  "7": { rating: 1442, games: 33 },
-  "8": { rating: 1408, games: 30 },
-  "9": { rating: 1465, games: 42 },
-  "10": { rating: 1405, games: 29 }
-};
 
 // Calculate win probability using ELO formula
 const calculateWinProbability = (team1Rating: number, team2Rating: number): number => {
@@ -48,6 +37,7 @@ const calculateWinProbability = (team1Rating: number, team2Rating: number): numb
 export const MatchOdds = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState({
     team1Defense: "",
     team1Offense: "",
@@ -70,6 +60,7 @@ export const MatchOdds = () => {
         setUsers(fetchedUsers);
       } catch (error) {
         console.error("Error loading users:", error);
+        setError("Failed to load players. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -86,16 +77,22 @@ export const MatchOdds = () => {
       selectedPlayers.team2Defense && 
       selectedPlayers.team2Offense
     ) {
-      const team1DefenseId = selectedPlayers.team1Defense;
-      const team1OffenseId = selectedPlayers.team1Offense;
-      const team2DefenseId = selectedPlayers.team2Defense;
-      const team2OffenseId = selectedPlayers.team2Offense;
+      const team1DefenseId = parseInt(selectedPlayers.team1Defense);
+      const team1OffenseId = parseInt(selectedPlayers.team1Offense);
+      const team2DefenseId = parseInt(selectedPlayers.team2Defense);
+      const team2OffenseId = parseInt(selectedPlayers.team2Offense);
 
-      // Get ratings from mock data
-      const team1DefenseRating = PLAYER_RATINGS[team1DefenseId]?.rating || 1400;
-      const team1OffenseRating = PLAYER_RATINGS[team1OffenseId]?.rating || 1400;
-      const team2DefenseRating = PLAYER_RATINGS[team2DefenseId]?.rating || 1400;
-      const team2OffenseRating = PLAYER_RATINGS[team2OffenseId]?.rating || 1400;
+      // Find the selected players in the users array
+      const team1DefensePlayer = users.find(user => user.id === team1DefenseId);
+      const team1OffensePlayer = users.find(user => user.id === team1OffenseId);
+      const team2DefensePlayer = users.find(user => user.id === team2DefenseId);
+      const team2OffensePlayer = users.find(user => user.id === team2OffenseId);
+
+      // Get ELO ratings (default to 1500 if not found)
+      const team1DefenseRating = team1DefensePlayer?.elo_score || 1500;
+      const team1OffenseRating = team1OffensePlayer?.elo_score || 1500;
+      const team2DefenseRating = team2DefensePlayer?.elo_score || 1500;
+      const team2OffenseRating = team2OffensePlayer?.elo_score || 1500;
 
       // Calculate team ratings (average)
       const team1Rating = (team1DefenseRating + team1OffenseRating) / 2;
@@ -128,7 +125,7 @@ export const MatchOdds = () => {
         predictedScore: { team1: team1Score, team2: team2Score }
       });
     }
-  }, [selectedPlayers]);
+  }, [selectedPlayers, users]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -144,155 +141,219 @@ export const MatchOdds = () => {
     return player ? player.name : "Unknown player";
   };
 
+  const getPlayerStats = (id: string) => {
+    if (!id) return null;
+    const player = users.find(user => user.id.toString() === id);
+    if (!player) return null;
+
+    return {
+      name: player.name,
+      elo: player.elo_score || 1500,
+      wins: player.wins || 0,
+      losses: player.losses || 0,
+      played: player.played || 0,
+      winRate: player.played ? Math.round((player.wins || 0) / player.played * 100) : 0
+    };
+  };
+
   return (
     <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
       <Heading as="h2" size="lg" mb={6}>Match Odds Prediction</Heading>
       
-      <Box mb={8}>
-        <Heading as="h3" size="md" mb={4}>Team Selection</Heading>
-        <SimpleGrid columns={2} spacing={6}>
-          <Box bg="blue.50" p={4} borderRadius="md">
-            <Heading as="h4" size="sm" mb={4} textAlign="center">Team 1</Heading>
-            <FormControl mb={3}>
-              <FormLabel>Defense Player</FormLabel>
-              <Select
-                name="team1Defense"
-                value={selectedPlayers.team1Defense}
-                onChange={handleChange}
-                placeholder="Select player"
-                isDisabled={loading}
-              >
-                {users.map(user => (
-                  <option key={`team1Defense-${user.id}`} value={user.id.toString()}>
-                    {user.name}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl>
-              <FormLabel>Offense Player</FormLabel>
-              <Select
-                name="team1Offense"
-                value={selectedPlayers.team1Offense}
-                onChange={handleChange}
-                placeholder="Select player"
-                isDisabled={loading}
-              >
-                {users.map(user => (
-                  <option key={`team1Offense-${user.id}`} value={user.id.toString()}>
-                    {user.name}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-          
-          <Box bg="rgba(245, 240, 225, 0.5)" p={4} borderRadius="md" borderColor="gray.200" borderWidth="1px">
-            <Heading as="h4" size="sm" mb={4} textAlign="center">Team 2</Heading>
-            <FormControl mb={3}>
-              <FormLabel>Defense Player</FormLabel>
-              <Select
-                name="team2Defense"
-                value={selectedPlayers.team2Defense}
-                onChange={handleChange}
-                placeholder="Select player"
-                isDisabled={loading}
-              >
-                {users.map(user => (
-                  <option key={`team2Defense-${user.id}`} value={user.id.toString()}>
-                    {user.name}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl>
-              <FormLabel>Offense Player</FormLabel>
-              <Select
-                name="team2Offense"
-                value={selectedPlayers.team2Offense}
-                onChange={handleChange}
-                placeholder="Select player"
-                isDisabled={loading}
-              >
-                {users.map(user => (
-                  <option key={`team2Offense-${user.id}`} value={user.id.toString()}>
-                    {user.name}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        </SimpleGrid>
-      </Box>
-      
-      {selectedPlayers.team1Defense && 
-       selectedPlayers.team1Offense && 
-       selectedPlayers.team2Defense && 
-       selectedPlayers.team2Offense && (
-        <>
-          <Divider my={6} />
-          <Box mb={8}>
-            <Heading as="h3" size="md" mb={4}>Win Probability</Heading>
-            <Flex direction={{ base: "column", md: "row" }} gap={4}>
-              <Stat flex="1" border="1px" borderColor="blue.100" p={3} borderRadius="md" bg="blue.50">
-                <StatLabel>Team 1</StatLabel>
-                <StatNumber>{matchPrediction.team1Probability}%</StatNumber>
-                <StatHelpText>
-                  {getPlayerName(selectedPlayers.team1Defense)} & {getPlayerName(selectedPlayers.team1Offense)}
-                </StatHelpText>
-              </Stat>
-              <Stat flex="1" border="1px" borderColor="gray.200" p={3} borderRadius="md" bg="rgba(245, 240, 225, 0.5)">
-                <StatLabel>Team 2</StatLabel>
-                <StatNumber>{matchPrediction.team2Probability}%</StatNumber>
-                <StatHelpText>
-                  {getPlayerName(selectedPlayers.team2Defense)} & {getPlayerName(selectedPlayers.team2Offense)}
-                </StatHelpText>
-              </Stat>
-            </Flex>
-            
-            <Box mt={4}>
-              <Progress 
-                value={matchPrediction.team1Probability} 
-                colorScheme="blue" 
-                height="24px" 
-                borderRadius="md"
-              />
-            </Box>
-          </Box>
-          
-          <Box mb={6}>
-            <Heading as="h3" size="md" mb={4}>Team Ratings</Heading>
-            <HStack justifyContent="space-between" mb={2}>
-              <Text fontWeight="bold">Team 1: {matchPrediction.team1Rating}</Text>
-              <Text fontWeight="bold">Team 2: {matchPrediction.team2Rating}</Text>
-            </HStack>
-            <Text fontSize="sm" color="gray.600" mb={6}>
-              Team ratings are calculated as the average of player ratings.
-            </Text>
-            
-            <Heading as="h3" size="md" mb={4}>Predicted Score</Heading>
-            <HStack justifyContent="center" spacing={8}>
-              <VStack>
-                <Text fontWeight="bold">Team 1</Text>
-                <Text fontSize="3xl">{matchPrediction.predictedScore.team1}</Text>
-              </VStack>
-              <Text fontSize="2xl">-</Text>
-              <VStack>
-                <Text fontWeight="bold">Team 2</Text>
-                <Text fontSize="3xl">{matchPrediction.predictedScore.team2}</Text>
-              </VStack>
-            </HStack>
-          </Box>
-        </>
+      {error && (
+        <Alert status="error" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Text>{error}</Text>
+        </Alert>
       )}
       
-      {!selectedPlayers.team1Defense || 
-       !selectedPlayers.team1Offense || 
-       !selectedPlayers.team2Defense || 
-       !selectedPlayers.team2Offense && (
-        <Box textAlign="center" p={8} color="gray.500">
-          <Text>Select all players to see match predictions</Text>
-        </Box>
+      {loading ? (
+        <Flex justify="center" py={8}>
+          <Spinner size="xl" />
+        </Flex>
+      ) : (
+        <>
+          <Box mb={8}>
+            <Heading as="h3" size="md" mb={4}>Team Selection</Heading>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              <Box bg="blue.50" p={4} borderRadius="md">
+                <Heading as="h4" size="sm" mb={4} textAlign="center">Team 1</Heading>
+                <FormControl mb={3}>
+                  <FormLabel>Defense Player</FormLabel>
+                  <Select
+                    name="team1Defense"
+                    value={selectedPlayers.team1Defense}
+                    onChange={handleChange}
+                    placeholder="Select player"
+                    isDisabled={loading}
+                  >
+                    {users.map(user => (
+                      <option key={`team1Defense-${user.id}`} value={user.id.toString()}>
+                        {user.name} (ELO: {user.elo_score || 1500})
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Offense Player</FormLabel>
+                  <Select
+                    name="team1Offense"
+                    value={selectedPlayers.team1Offense}
+                    onChange={handleChange}
+                    placeholder="Select player"
+                    isDisabled={loading}
+                  >
+                    {users.map(user => (
+                      <option key={`team1Offense-${user.id}`} value={user.id.toString()}>
+                        {user.name} (ELO: {user.elo_score || 1500})
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              <Box bg="rgba(245, 240, 225, 0.5)" p={4} borderRadius="md" borderColor="gray.200" borderWidth="1px">
+                <Heading as="h4" size="sm" mb={4} textAlign="center">Team 2</Heading>
+                <FormControl mb={3}>
+                  <FormLabel>Defense Player</FormLabel>
+                  <Select
+                    name="team2Defense"
+                    value={selectedPlayers.team2Defense}
+                    onChange={handleChange}
+                    placeholder="Select player"
+                    isDisabled={loading}
+                  >
+                    {users.map(user => (
+                      <option key={`team2Defense-${user.id}`} value={user.id.toString()}>
+                        {user.name} (ELO: {user.elo_score || 1500})
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Offense Player</FormLabel>
+                  <Select
+                    name="team2Offense"
+                    value={selectedPlayers.team2Offense}
+                    onChange={handleChange}
+                    placeholder="Select player"
+                    isDisabled={loading}
+                  >
+                    {users.map(user => (
+                      <option key={`team2Offense-${user.id}`} value={user.id.toString()}>
+                        {user.name} (ELO: {user.elo_score || 1500})
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            </SimpleGrid>
+          </Box>
+          
+          {selectedPlayers.team1Defense && 
+           selectedPlayers.team1Offense && 
+           selectedPlayers.team2Defense && 
+           selectedPlayers.team2Offense && (
+            <>
+              <Divider my={6} />
+              <Box mb={8}>
+                <Heading as="h3" size="md" mb={4}>Win Probability</Heading>
+                <Flex direction={{ base: "column", md: "row" }} gap={4}>
+                  <Stat flex="1" border="1px" borderColor="blue.100" p={3} borderRadius="md" bg="blue.50">
+                    <StatLabel>Team 1</StatLabel>
+                    <StatNumber>{matchPrediction.team1Probability}%</StatNumber>
+                    <StatHelpText>
+                      {getPlayerName(selectedPlayers.team1Defense)} & {getPlayerName(selectedPlayers.team1Offense)}
+                    </StatHelpText>
+                  </Stat>
+                  <Stat flex="1" border="1px" borderColor="gray.200" p={3} borderRadius="md" bg="rgba(245, 240, 225, 0.5)">
+                    <StatLabel>Team 2</StatLabel>
+                    <StatNumber>{matchPrediction.team2Probability}%</StatNumber>
+                    <StatHelpText>
+                      {getPlayerName(selectedPlayers.team2Defense)} & {getPlayerName(selectedPlayers.team2Offense)}
+                    </StatHelpText>
+                  </Stat>
+                </Flex>
+              </Box>
+              
+              <Box mb={8}>
+                <Heading as="h3" size="md" mb={4}>Predicted Score</Heading>
+                <Flex 
+                  p={4} 
+                  borderRadius="lg" 
+                  bg="gray.50" 
+                  justify="center"
+                  align="center"
+                  fontSize="2xl"
+                  fontWeight="bold"
+                >
+                  <Text color="blue.500">{matchPrediction.predictedScore.team1}</Text>
+                  <Text mx={4}>-</Text>
+                  <Text color="orange.500">{matchPrediction.predictedScore.team2}</Text>
+                </Flex>
+              </Box>
+              
+              <Box>
+                <Heading as="h3" size="md" mb={4}>Team Comparison</Heading>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>Team 1 (Average ELO: {matchPrediction.team1Rating})</Text>
+                    <Table size="sm" variant="simple">
+                      <Thead>
+                        <Tr>
+                          <Th>Player</Th>
+                          <Th isNumeric>ELO</Th>
+                          <Th isNumeric>Win %</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {[selectedPlayers.team1Defense, selectedPlayers.team1Offense].map((playerId, idx) => {
+                          const playerStats = getPlayerStats(playerId);
+                          if (!playerStats) return null;
+                          
+                          return (
+                            <Tr key={`team1-player-${idx}`}>
+                              <Td>{playerStats.name}</Td>
+                              <Td isNumeric>{playerStats.elo}</Td>
+                              <Td isNumeric>{playerStats.winRate}%</Td>
+                            </Tr>
+                          );
+                        })}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                  
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>Team 2 (Average ELO: {matchPrediction.team2Rating})</Text>
+                    <Table size="sm" variant="simple">
+                      <Thead>
+                        <Tr>
+                          <Th>Player</Th>
+                          <Th isNumeric>ELO</Th>
+                          <Th isNumeric>Win %</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {[selectedPlayers.team2Defense, selectedPlayers.team2Offense].map((playerId, idx) => {
+                          const playerStats = getPlayerStats(playerId);
+                          if (!playerStats) return null;
+                          
+                          return (
+                            <Tr key={`team2-player-${idx}`}>
+                              <Td>{playerStats.name}</Td>
+                              <Td isNumeric>{playerStats.elo}</Td>
+                              <Td isNumeric>{playerStats.winRate}%</Td>
+                            </Tr>
+                          );
+                        })}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                </SimpleGrid>
+              </Box>
+            </>
+          )}
+        </>
       )}
     </Box>
   );

@@ -18,72 +18,82 @@ import {
   HStack,
   Icon,
   useColorModeValue,
-  Avatar
+  Avatar,
+  Alert,
+  AlertIcon
 } from "@chakra-ui/react";
-import { getUsers } from "../lib/supabase";
+import { getUsers, getPlayerMatchHistory } from "../lib/supabase";
 import type { User } from "../lib/supabase";
 
 // Extended player type with statistics
 interface PlayerWithStats extends User {
-  rating: number;
-  gamesPlayed: number;
-  wins: number;
-  losses: number;
   winPercentage: number;
-  recentForm: ('W' | 'L')[];
+  recentForm: ('W' | 'L' | 'D')[];
 }
-
-// Mock data generator
-const generatePlayerStats = (user: User): PlayerWithStats => {
-  const gamesPlayed = Math.floor(Math.random() * 50) + 10;
-  const wins = Math.floor(Math.random() * gamesPlayed);
-  const losses = gamesPlayed - wins;
-  const winPercentage = Math.round((wins / gamesPlayed) * 100);
-  
-  // Generate random recent form (last 5 games)
-  const generateRecentForm = (): ('W' | 'L')[] => {
-    const form: ('W' | 'L')[] = [];
-    for (let i = 0; i < 5; i++) {
-      form.push(Math.random() > 0.5 ? 'W' : 'L');
-    }
-    return form;
-  };
-
-  return {
-    ...user,
-    rating: Math.round(1400 + Math.random() * 200),
-    gamesPlayed,
-    wins,
-    losses,
-    winPercentage,
-    recentForm: generateRecentForm()
-  };
-};
 
 export const Players = () => {
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [filteredPlayers, setFilteredPlayers] = useState<PlayerWithStats[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerWithStats;
     direction: 'ascending' | 'descending';
-  }>({ key: 'rating', direction: 'descending' });
+  }>({ key: 'elo_score', direction: 'descending' });
 
   useEffect(() => {
     async function loadUsers() {
       try {
+        setLoading(true);
         const fetchedUsers = await getUsers();
-        // Add mock statistics to each user
-        const playersWithStats = fetchedUsers.map(user => generatePlayerStats(user));
         
-        // Sort initially by rating descending
-        const sortedPlayers = [...playersWithStats].sort((a, b) => b.rating - a.rating);
+        // Process each user to get their recent form
+        const playersWithRecentForm = await Promise.all(
+          fetchedUsers.map(async (user) => {
+            if (!user.id) return { ...user, winPercentage: 0, recentForm: [] };
+            
+            try {
+              // Get match history for the player
+              const matchHistory = await getPlayerMatchHistory(user.id);
+              
+              // Calculate win percentage
+              const wins = user.wins || 0;
+              const played = user.played || 0;
+              const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
+              
+              // Get last 5 matches for recent form
+              const recentMatches = matchHistory.slice(0, 5);
+              const recentForm = recentMatches.map(match => 
+                match.result === 'Win' ? 'W' : match.result === 'Draw' ? 'D' : 'L'
+              ) as ('W' | 'L' | 'D')[];
+              
+              return {
+                ...user,
+                winPercentage,
+                recentForm
+              };
+            } catch (error) {
+              console.error(`Error fetching data for player ${user.id}:`, error);
+              return {
+                ...user,
+                winPercentage: 0,
+                recentForm: []
+              };
+            }
+          })
+        );
+        
+        // Sort initially by ELO score descending
+        const sortedPlayers = [...playersWithRecentForm].sort((a, b) => 
+          (b.elo_score || 0) - (a.elo_score || 0)
+        );
         
         setPlayers(sortedPlayers);
         setFilteredPlayers(sortedPlayers);
       } catch (error) {
         console.error("Error loading users:", error);
+        setError("Failed to load players. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -115,10 +125,17 @@ export const Players = () => {
     
     // Sort the filtered players
     const sortedPlayers = [...filteredPlayers].sort((a, b) => {
-      if (a[key] < b[key]) {
+      // Handle potential undefined values
+      const aValue = a[key];
+      const bValue = b[key];
+      
+      const valueA = aValue !== undefined ? aValue : 0;
+      const valueB = bValue !== undefined ? bValue : 0;
+      
+      if (valueA < valueB) {
         return direction === 'ascending' ? -1 : 1;
       }
-      if (a[key] > b[key]) {
+      if (valueA > valueB) {
         return direction === 'ascending' ? 1 : -1;
       }
       return 0;
@@ -134,13 +151,17 @@ export const Players = () => {
     return sortConfig.direction === 'ascending' ? '↑' : '↓';
   };
 
-  const renderRecentForm = (form: ('W' | 'L')[]) => {
+  const renderRecentForm = (form: ('W' | 'L' | 'D')[]) => {
+    if (form.length === 0) {
+      return <Text fontSize="sm" color="gray.500">No recent matches</Text>;
+    }
+    
     return (
       <HStack spacing={1}>
         {form.map((result, index) => (
           <Badge 
             key={index} 
-            colorScheme={result === 'W' ? 'green' : 'red'} 
+            colorScheme={result === 'W' ? 'green' : result === 'D' ? 'yellow' : 'red'} 
             variant="solid" 
             fontSize="xs"
             borderRadius="full"
@@ -168,6 +189,13 @@ export const Players = () => {
         />
       </InputGroup>
       
+      {error && (
+        <Alert status="error" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Text>{error}</Text>
+        </Alert>
+      )}
+      
       {loading ? (
         <Flex justify="center" py={8}>
           <Spinner size="xl" />
@@ -179,11 +207,11 @@ export const Players = () => {
               <Tr>
                 <Th>#</Th>
                 <Th>Player</Th>
-                <Th onClick={() => handleSort('rating')} cursor="pointer">
-                  ELO Rating {renderSortIcon('rating')}
+                <Th onClick={() => handleSort('elo_score')} cursor="pointer">
+                  ELO Rating {renderSortIcon('elo_score')}
                 </Th>
-                <Th onClick={() => handleSort('gamesPlayed')} cursor="pointer">
-                  Games {renderSortIcon('gamesPlayed')}
+                <Th onClick={() => handleSort('played')} cursor="pointer">
+                  Games {renderSortIcon('played')}
                 </Th>
                 <Th onClick={() => handleSort('wins')} cursor="pointer">
                   Wins {renderSortIcon('wins')}
@@ -209,12 +237,12 @@ export const Players = () => {
                   </Td>
                   <Td>
                     <Badge colorScheme="purple" fontSize="md">
-                      {player.rating}
+                      {player.elo_score || 1500}
                     </Badge>
                   </Td>
-                  <Td>{player.gamesPlayed}</Td>
-                  <Td>{player.wins}</Td>
-                  <Td>{player.losses}</Td>
+                  <Td>{player.played || 0}</Td>
+                  <Td>{player.wins || 0}</Td>
+                  <Td>{player.losses || 0}</Td>
                   <Td>
                     <Badge colorScheme={player.winPercentage >= 50 ? 'green' : 'orange'}>
                       {player.winPercentage}%
@@ -226,7 +254,7 @@ export const Players = () => {
             </Tbody>
           </Table>
           
-          {filteredPlayers.length === 0 && (
+          {filteredPlayers.length === 0 && !loading && (
             <Box textAlign="center" py={8}>
               <Text>No players found matching your search.</Text>
             </Box>

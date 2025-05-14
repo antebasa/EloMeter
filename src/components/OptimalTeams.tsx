@@ -19,38 +19,43 @@ import {
   Spinner,
   Divider,
   Badge,
-  HStack
+  HStack,
+  Alert,
+  AlertIcon
 } from "@chakra-ui/react";
 import { getUsers } from "../lib/supabase";
 import type { User } from "../lib/supabase";
 
-// Mock player ratings with skills 
-interface PlayerWithRating extends User {
-  rating: number;
+// Enhanced player type with additional skills
+interface PlayerWithSkills extends User {
   defenseSkill: number;
   offenseSkill: number;
 }
 
-// Generate mock player ratings
-const generatePlayerRatings = (users: User[]): PlayerWithRating[] => {
-  return users.map(user => ({
-    ...user,
-    rating: Math.round(1400 + Math.random() * 200), // Random rating between 1400-1600
-    defenseSkill: Math.round(1 + Math.random() * 9), // Random skill 1-10
-    offenseSkill: Math.round(1 + Math.random() * 9) // Random skill 1-10
-  }));
-};
-
 // Function to generate balanced teams
-const generateBalancedTeams = (selectedPlayers: PlayerWithRating[]) => {
+const generateBalancedTeams = (selectedPlayers: PlayerWithSkills[]) => {
   if (selectedPlayers.length < 4) return null;
 
-  const calculateTeamRating = (players: PlayerWithRating[]) => {
-    return players.reduce((total, player) => total + player.rating, 0) / players.length;
+  const calculateTeamRating = (players: PlayerWithSkills[]) => {
+    return players.reduce((total, player) => total + (player.elo_score || 1500), 0) / players.length;
   };
 
   // Try all possible combinations of 2 teams of 2 players each
-  let bestCombination = null;
+  let bestCombination: {
+    team1: PlayerWithSkills[];
+    team2: PlayerWithSkills[];
+    team1Rating: number;
+    team2Rating: number;
+    difference: number;
+    team1Roles?: {
+      defense: PlayerWithSkills;
+      offense: PlayerWithSkills;
+    };
+    team2Roles?: {
+      defense: PlayerWithSkills;
+      offense: PlayerWithSkills;
+    };
+  } | null = null;
   let smallestDifference = Infinity;
 
   // We know we have 4 players, find the most balanced teams
@@ -91,8 +96,79 @@ const generateBalancedTeams = (selectedPlayers: PlayerWithRating[]) => {
   return bestCombination;
 };
 
+// Calculate player skill metrics based on their stats
+const calculatePlayerSkills = (player: User): PlayerWithSkills => {
+  // Use played games to adjust skill weighting
+  const gamesPlayed = player.played || 0;
+  const experienceFactor = Math.min(gamesPlayed / 10, 1); // Max experience factor is 1
+
+  // Base values start at 5 (average)
+  let defenseSkill = 5;
+  let offenseSkill = 5;
+
+  // If we have actual stats, use them to calculate skill levels
+  if (player.elo_score && player.wins !== undefined && player.losses !== undefined) {
+    // Defense skill - players who concede fewer goals are better at defense
+    const totalGames = player.played || 0;
+    const goalsScored = player.goals || 0;
+    const goalsConceded = player.conceded || 0;
+    
+    // Avg goals conceded per game - lower is better for defense
+    const avgConceded = totalGames > 0 ? goalsConceded / totalGames : 0;
+    
+    // Avg goals scored per game - higher is better for offense
+    const avgScored = totalGames > 0 ? goalsScored / totalGames : 0;
+    
+    // Win ratio affects both offense and defense
+    const winRatio = totalGames > 0 ? (player.wins / totalGames) : 0;
+    
+    // ELO rating relative to base 1500 affects both skills
+    const eloModifier = player.elo_score > 1500 ? 
+      (player.elo_score - 1500) / 200 : // Positive modifier
+      (player.elo_score - 1500) / 300;  // Negative modifier (less impact)
+    
+    // Calculate defense skill (scale 1-10)
+    defenseSkill = 5; // Base value
+    
+    // Lower conceded goals improves defense skill
+    defenseSkill += totalGames > 0 ? (1 - Math.min(avgConceded / 5, 1)) * 2 : 0;
+    
+    // Win ratio improves skill
+    defenseSkill += winRatio * 2;
+    
+    // ELO rating adjustment
+    defenseSkill += eloModifier;
+    
+    // Calculate offense skill (scale 1-10)
+    offenseSkill = 5; // Base value
+    
+    // Higher scored goals improves offense skill
+    offenseSkill += Math.min(avgScored, 3) / 3 * 3;
+    
+    // Win ratio improves skill
+    offenseSkill += winRatio * 2;
+    
+    // ELO rating adjustment
+    offenseSkill += eloModifier;
+  }
+  
+  // Apply experience factor - more experienced players have more reliable skill ratings
+  defenseSkill = 5 + (defenseSkill - 5) * experienceFactor;
+  offenseSkill = 5 + (offenseSkill - 5) * experienceFactor;
+  
+  // Ensure skills stay in range 1-10
+  defenseSkill = Math.max(1, Math.min(10, Math.round(defenseSkill * 10) / 10));
+  offenseSkill = Math.max(1, Math.min(10, Math.round(offenseSkill * 10) / 10));
+
+  return {
+    ...player,
+    defenseSkill,
+    offenseSkill
+  };
+};
+
 // Helper function to assign defense/offense roles
-const assignRoles = (team: PlayerWithRating[]) => {
+const assignRoles = (team: PlayerWithSkills[]) => {
   // If player 1 has better defense skill relative to their offense skill
   // compared to player 2, make player 1 defense
   const player1DefenseAdvantage = team[0].defenseSkill - team[0].offenseSkill;
@@ -113,21 +189,24 @@ const assignRoles = (team: PlayerWithRating[]) => {
 
 export const OptimalTeams = () => {
   const [users, setUsers] = useState<User[]>([]);
-  const [playersWithRatings, setPlayersWithRatings] = useState<PlayerWithRating[]>([]);
+  const [playersWithSkills, setPlayersWithSkills] = useState<PlayerWithSkills[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [optimalTeams, setOptimalTeams] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadUsers() {
       try {
         const fetchedUsers = await getUsers();
         setUsers(fetchedUsers);
-        // Generate mock ratings for all users
-        const withRatings = generatePlayerRatings(fetchedUsers);
-        setPlayersWithRatings(withRatings);
+        
+        // Calculate skills for all users based on their stats
+        const withSkills = fetchedUsers.map(calculatePlayerSkills);
+        setPlayersWithSkills(withSkills);
       } catch (error) {
         console.error("Error loading users:", error);
+        setError("Failed to load players. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -146,7 +225,7 @@ export const OptimalTeams = () => {
   const generateTeams = () => {
     // Only generate teams if exactly 4 players are selected
     if (selectedPlayerIds.length === 4) {
-      const selectedPlayers = playersWithRatings.filter(
+      const selectedPlayers = playersWithSkills.filter(
         player => selectedPlayerIds.includes(player.id.toString())
       );
       const teams = generateBalancedTeams(selectedPlayers);
@@ -157,6 +236,13 @@ export const OptimalTeams = () => {
   return (
     <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
       <Heading as="h2" size="lg" mb={6}>Optimal Teams Generator</Heading>
+      
+      {error && (
+        <Alert status="error" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Text>{error}</Text>
+        </Alert>
+      )}
       
       {loading ? (
         <Flex justify="center" py={8}>
@@ -172,7 +258,7 @@ export const OptimalTeams = () => {
               onChange={handlePlayerSelection}
             >
               <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={3}>
-                {playersWithRatings.map(player => (
+                {playersWithSkills.map(player => (
                   <Checkbox 
                     key={player.id} 
                     value={player.id.toString()}
@@ -180,7 +266,7 @@ export const OptimalTeams = () => {
                   >
                     <HStack>
                       <Text>{player.name}</Text>
-                      <Badge colorScheme="purple">{player.rating}</Badge>
+                      <Badge colorScheme="purple">{player.elo_score || 1500}</Badge>
                     </HStack>
                   </Checkbox>
                 ))}
@@ -203,7 +289,7 @@ export const OptimalTeams = () => {
               <Divider mb={6} />
               <Heading as="h3" size="md" mb={6} textAlign="center">Optimal Teams</Heading>
               
-              <SimpleGrid columns={2} spacing={6}>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                 <Card variant="filled" bg="blue.50">
                   <CardHeader pb={0}>
                     <Heading size="md" textAlign="center">Team 1</Heading>
@@ -271,20 +357,15 @@ export const OptimalTeams = () => {
                       <Stat mt={2} p={2} bg="blue.100" borderRadius="md">
                         <StatLabel>Team Rating</StatLabel>
                         <StatNumber>{Math.round(optimalTeams.team2Rating)}</StatNumber>
+                        <StatHelpText>
+                          {optimalTeams.difference < 50 ? 'Very Balanced' : 
+                            optimalTeams.difference < 100 ? 'Balanced' : 'Imbalanced'}
+                        </StatHelpText>
                       </Stat>
                     </VStack>
                   </CardBody>
                 </Card>
               </SimpleGrid>
-              
-              <Box textAlign="center" mt={6}>
-                <Text>
-                  Rating Difference: <Badge fontSize="md" colorScheme="purple">{Math.round(optimalTeams.difference)}</Badge>
-                </Text>
-                <Text fontSize="sm" color="gray.600" mt={2}>
-                  These teams are optimized for balanced ratings and optimal player positions.
-                </Text>
-              </Box>
             </Box>
           )}
         </>
