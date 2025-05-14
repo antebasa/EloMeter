@@ -30,11 +30,12 @@ const NavItem = ({ children, icon, isActive, onClick }: NavItemProps) => {
       role="group"
       fontWeight={isActive ? "bold" : "normal"}
       transition=".15s ease"
-      bg={isActive ? "blue.100" : "transparent"}
-      color={isActive ? "blue.800" : "inherit"}
+      bg={isActive ? "blue.700" : "transparent"}
+      color={isActive ? "white" : "gray.300"}
       borderRadius="md"
       _hover={{
-        bg: "blue.50",
+        bg: "blue.600",
+        color: "white"
       }}
       onClick={onClick}
     >
@@ -70,16 +71,16 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
       {/* Sidebar */}
       <Box
         w="250px"
-        bg={useColorModeValue('white', 'gray.900')}
+        bg="#1A202C" // Dark background 
         borderRight="1px"
-        borderRightColor={useColorModeValue('gray.200', 'gray.700')}
+        borderRightColor="gray.700"
         py="5"
       >
         <VStack align="flex-start" spacing="1" h="full">
           <Box px="4" pb="5" w="full">
-            <Heading size="md">EloMeter</Heading>
+            <Heading size="md" color="white">EloMeter</Heading>
           </Box>
-          <Divider />
+          <Divider borderColor="gray.700" />
           <Box w="full" pt="5">
             {navItems.map((item) => (
               <NavItem 
@@ -95,7 +96,7 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
       </Box>
 
       {/* Main content */}
-      <Box flex="1" overflowY="auto" p="5">
+      <Box flex="1" overflowY="auto" p="5" bg="#2D3748"> {/* Slightly lighter dark background */}
         {children}
       </Box>
     </Flex>

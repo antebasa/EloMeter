@@ -9,7 +9,14 @@ import {
   SimpleGrid,
   VStack,
   Heading,
-  useToast
+  useToast,
+  HStack,
+  Text,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { getUsers, insertSampleUsers } from "../lib/supabase";
@@ -20,11 +27,12 @@ interface EnterScoreProps {
 }
 
 interface FormData {
-  player1: string;
-  player2: string;
-  player3: string;
-  player4: string;
-  score: string;
+  team1Defense: string;
+  team1Offense: string;
+  team2Defense: string;
+  team2Offense: string;
+  team1Score: number;
+  team2Score: number;
 }
 
 export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
@@ -33,16 +41,18 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
   const toast = useToast();
 
   const [formData, setFormData] = useState<FormData>({
-    player1: "",
-    player2: "",
-    player3: "",
-    player4: "",
-    score: ""
+    team1Defense: "",
+    team1Offense: "",
+    team2Defense: "",
+    team2Offense: "",
+    team1Score: 0,
+    team2Score: 0
   });
 
   useEffect(() => {
     async function loadUsers() {
       try {
+        await insertSampleUsers();
         const fetchedUsers = await getUsers();
         setUsers(fetchedUsers);
       } catch (error) {
@@ -70,110 +80,138 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
     }));
   };
 
+  const handleScoreChange = (team: 'team1Score' | 'team2Score', value: number) => {
+    setFormData(prev => ({
+      ...prev,
+      [team]: value
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
   };
 
   return (
-    <Box>
-      <Heading as="h2" size="lg" mb={6}>Enter Score</Heading>
-      <Box as="form" onSubmit={handleSubmit} width="100%" maxWidth="600px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
-        <VStack spacing={6} align="stretch">
-          <SimpleGrid columns={2} spacing={4}>
-            <FormControl isRequired>
-              <FormLabel>Player 1</FormLabel>
+    <Box maxWidth="500px" mx="auto" mt={10} p={6} borderRadius="lg" boxShadow="md" bg="white">
+      <Flex align="center" mb={6}>
+        <Button variant="ghost" mr={2} leftIcon={<Text>←</Text>} />
+        <Heading as="h2" size="lg" textAlign="center" flex="1">New Foosball Match</Heading>
+      </Flex>
+      <Box as="form" onSubmit={handleSubmit}>
+        <SimpleGrid columns={2} spacing={6} mb={6}>
+          <Box bg="blue.50" p={4} borderRadius="md">
+            <Heading as="h3" size="md" mb={4} textAlign="center">Team 1</Heading>
+            <FormControl mb={3} isRequired>
+              <FormLabel>Defense Player</FormLabel>
               <Select
-                name="player1"
-                value={formData.player1}
+                name="team1Defense"
+                value={formData.team1Defense}
                 onChange={handleChange}
                 placeholder="Select player"
                 isDisabled={loading}
               >
                 {users.map(user => (
-                  <option key={`player1-${user.id}`} value={user.id.toString()}>
+                  <option key={`team1Defense-${user.id}`} value={user.id.toString()}>
                     {user.name}
                   </option>
                 ))}
               </Select>
             </FormControl>
-
             <FormControl isRequired>
-              <FormLabel>Player 2</FormLabel>
+              <FormLabel>Offense Player</FormLabel>
               <Select
-                name="player2"
-                value={formData.player2}
+                name="team1Offense"
+                value={formData.team1Offense}
                 onChange={handleChange}
                 placeholder="Select player"
                 isDisabled={loading}
               >
                 {users.map(user => (
-                  <option key={`player2-${user.id}`} value={user.id.toString()}>
+                  <option key={`team1Offense-${user.id}`} value={user.id.toString()}>
                     {user.name}
                   </option>
                 ))}
               </Select>
             </FormControl>
-          </SimpleGrid>
-
-          <SimpleGrid columns={2} spacing={4}>
-            <FormControl isRequired>
-              <FormLabel>Player 3</FormLabel>
+          </Box>
+          <Box bg="rgba(245, 240, 225, 0.5)" p={4} borderRadius="md" borderColor="gray.200" borderWidth="1px">
+            <Heading as="h3" size="md" mb={4} textAlign="center">Team 2</Heading>
+            <FormControl mb={3} isRequired>
+              <FormLabel>Defense Player</FormLabel>
               <Select
-                name="player3"
-                value={formData.player3}
+                name="team2Defense"
+                value={formData.team2Defense}
                 onChange={handleChange}
                 placeholder="Select player"
                 isDisabled={loading}
               >
                 {users.map(user => (
-                  <option key={`player3-${user.id}`} value={user.id.toString()}>
+                  <option key={`team2Defense-${user.id}`} value={user.id.toString()}>
                     {user.name}
                   </option>
                 ))}
               </Select>
             </FormControl>
-
             <FormControl isRequired>
-              <FormLabel>Player 4</FormLabel>
+              <FormLabel>Offense Player</FormLabel>
               <Select
-                name="player4"
-                value={formData.player4}
+                name="team2Offense"
+                value={formData.team2Offense}
                 onChange={handleChange}
                 placeholder="Select player"
                 isDisabled={loading}
               >
                 {users.map(user => (
-                  <option key={`player4-${user.id}`} value={user.id.toString()}>
+                  <option key={`team2Offense-${user.id}`} value={user.id.toString()}>
                     {user.name}
                   </option>
                 ))}
               </Select>
             </FormControl>
-          </SimpleGrid>
-
-          <FormControl isRequired>
-            <FormLabel>Score</FormLabel>
-            <Input
-              name="score"
-              value={formData.score}
-              onChange={handleChange}
-              placeholder="Enter score (e.g., 10-8)"
-              type="text"
-            />
-          </FormControl>
-
-          <Flex justify="flex-end">
-            <Button
-              type="submit"
-              colorScheme="blue"
-              isLoading={loading}
-              isDisabled={loading || !formData.player1 || !formData.player2 || !formData.player3 || !formData.player4 || !formData.score}
-            >
-              Save Match Result
-            </Button>
-          </Flex>
-        </VStack>
+          </Box>
+        </SimpleGrid>
+        <Heading as="h3" size="md" mb={4} textAlign="center">Match Result</Heading>
+        <Flex justify="center" mb={6} align="center">
+          <NumberInput 
+            min={0} 
+            max={99} 
+            value={formData.team1Score}
+            onChange={(_, value) => handleScoreChange('team1Score', value)}
+            width="80px"
+          >
+            <NumberInputField textAlign="center" fontSize="3xl" />
+            <NumberInputStepper>
+              <NumberIncrementStepper />
+              <NumberDecrementStepper />
+            </NumberInputStepper>
+          </NumberInput>
+          
+          <Text fontSize="3xl" mx={4}>-</Text>
+          
+          <NumberInput 
+            min={0} 
+            max={99} 
+            value={formData.team2Score}
+            onChange={(_, value) => handleScoreChange('team2Score', value)}
+            width="80px"
+          >
+            <NumberInputField textAlign="center" fontSize="3xl" />
+            <NumberInputStepper>
+              <NumberIncrementStepper />
+              <NumberDecrementStepper />
+            </NumberInputStepper>
+          </NumberInput>
+        </Flex>
+        <Button 
+          type="submit" 
+          colorScheme="green"
+          width="full"
+          isLoading={loading}
+          isDisabled={loading || !formData.team1Defense || !formData.team1Offense || !formData.team2Defense || !formData.team2Offense}
+        >
+          Save Result
+        </Button>
       </Box>
     </Box>
   );
