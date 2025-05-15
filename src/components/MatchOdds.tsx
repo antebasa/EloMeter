@@ -1,37 +1,36 @@
-import { useState, useEffect } from "react";
-import { 
-  Box, 
-  Heading, 
-  Text, 
-  Select, 
-  FormControl, 
-  FormLabel, 
-  SimpleGrid, 
-  Stat, 
-  StatLabel, 
-  StatNumber, 
-  StatHelpText,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Divider,
-  Flex,
-  VStack,
+import {useEffect, useState} from "react";
+import {
   Alert,
   AlertIcon,
-  Spinner,
+  Box,
   Card,
-  CardHeader,
   CardBody,
-  Tag,
+  CardHeader,
+  Flex,
+  FormControl,
+  FormLabel,
+  Heading,
+  Select,
+  SimpleGrid,
+  Spinner,
   StackDivider,
-  useColorModeValue
+  Stat,
+  StatHelpText,
+  StatLabel,
+  StatNumber,
+  Table,
+  Tag,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useColorModeValue,
+  VStack
 } from "@chakra-ui/react";
-import { getUsers, getMatchHistoryBetweenTeams, getHistoricalMatchupStatsByColor } from "../lib/supabase";
-import type { User, HistoricalMatchupStats } from "../lib/supabase";
+import type {User} from "../lib/supabase";
+import {getHistoricalMatchupStatsByColor, getMatchHistoryBetweenTeams, getUsers} from "../lib/supabase";
 
 const DEFAULT_DISPLAY_ELO = 1400;
 
@@ -47,7 +46,7 @@ const predictScore = (winProbabilityTeam1: number) => {
   let team1Score: number;
   let team2Score: number;
 
-  if (Math.abs(winProbabilityTeam1 - 0.5) < 0.01) { 
+  if (Math.abs(winProbabilityTeam1 - 0.5) < 0.01) {
     team1Score = 10;
     team2Score = 9;
   } else if (winProbabilityTeam1 > 0.5) {
@@ -104,7 +103,7 @@ export const MatchOdds = () => {
 
   const [eloPrediction, setEloPrediction] = useState<EloPredictionScenario | null>(null);
   const [historicalPredictions, setHistoricalPredictions] = useState<HistoricalPredictionScenario[]>([]);
-  
+
   const [recentMatches, setRecentMatches] = useState<any[]>([]);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
 
@@ -170,12 +169,12 @@ export const MatchOdds = () => {
 
           // Historical Predictions
           const historicalStats = await getHistoricalMatchupStatsByColor(
-            t1dUser.id, t1oUser.id, 
+            t1dUser.id, t1oUser.id,
             t2dUser.id, t2oUser.id
           );
 
           const newHistoricalPredictions: HistoricalPredictionScenario[] = [];
-          
+
           // Scenario: Team 1 as White
           const { wins: t1AsWhiteWins, losses: t1AsWhiteLosses, draws: t1AsWhiteDraws, total_played: t1AsWhiteTotal } = historicalStats.teamA_as_white;
           let t1AsWhiteWinProb = 0.5; // Default to 0.5 if no historical data
@@ -215,7 +214,7 @@ export const MatchOdds = () => {
 
           // Fetch recent matches (overall, not color specific for this display part)
           const history = await getMatchHistoryBetweenTeams(
-            t1dUser.id, t1oUser.id, 
+            t1dUser.id, t1oUser.id,
             t2dUser.id, t2oUser.id,
             5 // limit to 5 recent matches
           );
@@ -252,7 +251,7 @@ export const MatchOdds = () => {
       elo_defense: player.elo_defense || DEFAULT_DISPLAY_ELO
     } : null;
   };
-  
+
   const renderPlayerSelect = (teamKey: 'team1' | 'team2', role: 'Defense' | 'Offense') => {
     const selectName = `${teamKey}${role}` as keyof typeof selectedPlayers;
     const value = selectedPlayers[selectName];
@@ -356,14 +355,14 @@ export const MatchOdds = () => {
   return (
     <Box maxWidth="1000px" mx="auto" p={6} >
       <Heading as="h2" size="xl" mb={6} textAlign="center" color={headingColor}>Match Predictor</Heading>
-      
+
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
           <AlertIcon />
           <Text>{error}</Text>
         </Alert>
       )}
-      
+
       {loadingUsers && (
         <Flex justify="center" py={10}><Spinner size="xl" color="teal.500" /></Flex>
       )}
@@ -455,4 +454,4 @@ export const MatchOdds = () => {
       )}
     </Box>
   );
-}; 
+};

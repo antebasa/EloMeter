@@ -1,31 +1,31 @@
-import { useState, useEffect } from "react";
-import { 
-  Box, 
-  Heading, 
-  Text, 
-  Button, 
-  SimpleGrid, 
-  Checkbox, 
-  CheckboxGroup, 
-  VStack, 
-  Card, 
-  CardHeader, 
-  CardBody, 
-  Stat, 
-  StatLabel, 
-  StatNumber, 
-  StatHelpText,
-  Flex,
-  Spinner,
-  Divider,
-  Badge,
-  HStack,
+import {useEffect, useState} from "react";
+import {
   Alert,
   AlertIcon,
-  useColorModeValue
+  Badge,
+  Box,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Checkbox,
+  CheckboxGroup,
+  Divider,
+  Flex,
+  Heading,
+  HStack,
+  SimpleGrid,
+  Spinner,
+  Stat,
+  StatHelpText,
+  StatLabel,
+  StatNumber,
+  Text,
+  useColorModeValue,
+  VStack
 } from "@chakra-ui/react";
-import { getUsers, getHistoricalMatchupStatsByColor } from "../lib/supabase";
-import type { User } from "../lib/supabase";
+import type {User} from "../lib/supabase";
+import {getHistoricalMatchupStatsByColor, getUsers} from "../lib/supabase";
 
 // Extended player interface with skill ratings
 interface PlayerWithSkills extends User {
@@ -85,12 +85,11 @@ const generateBalancedTeams = (selectedPlayers: PlayerWithSkills[]) => {
 const calculatePlayerSkills = (player: User): PlayerWithSkills => {
   // Use played games to adjust skill weighting
   const gamesPlayed = player.played || 0;
-  const experienceFactor = Math.min(gamesPlayed / 10, 1); // Max experience factor is 1
 
   // Use the actual ELO values directly
   const defenseElo = player.elo_defense || 1400;
   const offenseElo = player.elo_offense || 1400;
-  
+
   // Scale ELO to 1-10 skill range
   // Assuming 1300-1700 as the typical ELO range, map to 1-10
   const defenseSkill = Math.max(1, Math.min(10, (defenseElo - 1300) / 400 * 9 + 1));
@@ -177,7 +176,6 @@ interface HistoricalPredictionScenario {
 }
 
 export const OptimalTeams = () => {
-  const [users, setUsers] = useState<User[]>([]);
   const [playersWithSkills, setPlayersWithSkills] = useState<PlayerWithSkills[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [optimalTeamData, setOptimalTeamData] = useState<any>(null); // Stores result from generateBalancedTeams
@@ -193,8 +191,7 @@ export const OptimalTeams = () => {
     async function loadUsers() {
       try {
         const fetchedUsers = await getUsers();
-        setUsers(fetchedUsers);
-        
+
         // Calculate skills for all users based on their stats
         const withSkills = fetchedUsers.map(calculatePlayerSkills);
         setPlayersWithSkills(withSkills);
@@ -238,7 +235,7 @@ export const OptimalTeams = () => {
         const team1Player2 = balancedTeamInfo.team1[1];
         const team2Player1 = balancedTeamInfo.team2[0];
         const team2Player2 = balancedTeamInfo.team2[1];
-        
+
         const team1DefPlayer = balancedTeamInfo.team1Roles.defense;
         const team1OffPlayer = balancedTeamInfo.team1Roles.offense;
         const team2DefPlayer = balancedTeamInfo.team2Roles.defense;
@@ -268,13 +265,13 @@ export const OptimalTeams = () => {
         // 2. Historical Predictions
         const team1UserIds = [team1Player1.id, team1Player2.id].sort();
         const team2UserIds = [team2Player1.id, team2Player2.id].sort();
-        
+
         const newHistoricalPredictions: HistoricalPredictionScenario[] = [];
 
         // Scenario: Team 1 (White) vs Team 2 (Blue)
         // Get stats for Team 1 (as Team A) vs Team 2 (as Team B)
         const statsTeam1AsTeamA = await getHistoricalMatchupStatsByColor(
-          team1UserIds[0], team1UserIds[1], 
+          team1UserIds[0], team1UserIds[1],
           team2UserIds[0], team2UserIds[1]
         );
 
@@ -282,7 +279,7 @@ export const OptimalTeams = () => {
         const totalPlayedT1White = t1WhiteStats.wins + t1WhiteStats.losses + t1WhiteStats.draws;
         const winProbT1White = totalPlayedT1White > 0 ? (t1WhiteStats.wins + 0.5 * t1WhiteStats.draws) / totalPlayedT1White : 0.5;
         const scoreT1White = predictScore(winProbT1White);
-        
+
         newHistoricalPredictions.push({
           scenarioTitle: `Team ${team1Player1.name} & ${team1Player2.name} (White) vs Team ${team2Player1.name} & ${team2Player2.name} (Blue)`,
           teamName: `Team ${team1Player1.name} & ${team1Player2.name}`,
@@ -295,13 +292,13 @@ export const OptimalTeams = () => {
           predictedScore: scoreT1White
         });
 
-        // Scenario: Team 1 (Blue) vs Team 2 (White) 
+        // Scenario: Team 1 (Blue) vs Team 2 (White)
         // Get stats for Team 2 (as Team A - White) vs Team 1 (as Team B - Blue)
         const statsTeam2AsTeamA = await getHistoricalMatchupStatsByColor(
           team2UserIds[0], team2UserIds[1], // Team 2 is Team A (White)
           team1UserIds[0], team1UserIds[1]  // Team 1 is Team B (Blue)
         );
-        
+
         const t2WhiteStats = statsTeam2AsTeamA.teamA_as_white; // Stats for Team 2 (White) vs Team 1 (Blue)
         const totalPlayedT1Blue = t2WhiteStats.wins + t2WhiteStats.losses + t2WhiteStats.draws;
         // Win probability for Team 1 (Blue) is when Team 2 (White) loses or draws (partially)
@@ -338,14 +335,14 @@ export const OptimalTeams = () => {
   return (
     <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg={useColorModeValue("white", "gray.800")}>
       <Heading as="h2" size="lg" mb={6} color={useColorModeValue("gray.700", "whiteAlpha.900")}>Optimal Teams Generator</Heading>
-      
+
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
           <AlertIcon />
           <Text>{error}</Text>
         </Alert>
       )}
-      
+
       {loading ? (
         <Flex justify="center" py={8}>
           <Spinner size="xl" />
@@ -354,15 +351,15 @@ export const OptimalTeams = () => {
         <>
           <Box mb={6}>
             <Heading as="h3" size="md" mb={4}>Select 4 Players</Heading>
-            <CheckboxGroup 
-              colorScheme="blue" 
+            <CheckboxGroup
+              colorScheme="blue"
               value={selectedPlayerIds}
               onChange={handlePlayerSelection}
             >
               <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={3}>
                 {playersWithSkills.map(player => (
-                  <Checkbox 
-                    key={player.id} 
+                  <Checkbox
+                    key={player.id}
                     value={player.id.toString()}
                     isDisabled={selectedPlayerIds.length >= 4 && !selectedPlayerIds.includes(player.id.toString())}
                   >
@@ -376,18 +373,18 @@ export const OptimalTeams = () => {
               </SimpleGrid>
             </CheckboxGroup>
           </Box>
-          
-          <Button 
-            colorScheme="blue" 
-            size="lg" 
-            mb={8} 
+
+          <Button
+            colorScheme="blue"
+            size="lg"
+            mb={8}
             onClick={generateTeams}
             isDisabled={selectedPlayerIds.length !== 4 || loadingPredictions}
             isLoading={loadingPredictions}
           >
             Generate Optimal Teams & Predictions
           </Button>
-          
+
           {loadingPredictions && (
             <Flex justify="center" py={8}><Spinner size="xl" /></Flex>
           )}
@@ -419,7 +416,7 @@ export const OptimalTeams = () => {
                           </HStack>
                         </Flex>
                       </Box>
-                      
+
                       <Box p={3} bg={useColorModeValue("white", "gray.700")} borderRadius="md" shadow="sm">
                         <Text fontWeight="bold">Offense</Text>
                         <Flex justify="space-between" align="center">
@@ -430,7 +427,7 @@ export const OptimalTeams = () => {
                           </HStack>
                         </Flex>
                       </Box>
-                      
+
                       <Stat mt={2} p={2} bg={useColorModeValue("blue.100", "blue.700")} borderRadius="md">
                         <StatLabel>Team Skill Rating</StatLabel>
                         <StatNumber>{optimalTeamData.team1Rating.toFixed(1)}</StatNumber>
@@ -438,7 +435,7 @@ export const OptimalTeams = () => {
                     </VStack>
                   </CardBody>
                 </Card>
-              
+
                 <Card variant="filled" bg={useColorModeValue("orange.50", "orange.800")}>
                   <CardHeader pb={0}>
                     <Heading size="md" textAlign="center">Team 2: {optimalTeamData.team2Roles.defense.name} & {optimalTeamData.team2Roles.offense.name}</Heading>
@@ -455,7 +452,7 @@ export const OptimalTeams = () => {
                           </HStack>
                         </Flex>
                       </Box>
-                      
+
                       <Box p={3} bg={useColorModeValue("white", "gray.700")} borderRadius="md" shadow="sm">
                         <Text fontWeight="bold">Offense</Text>
                         <Flex justify="space-between" align="center">
@@ -466,7 +463,7 @@ export const OptimalTeams = () => {
                           </HStack>
                         </Flex>
                       </Box>
-                      
+
                       <Stat mt={2} p={2} bg={useColorModeValue("orange.100", "orange.700")} borderRadius="md">
                         <StatLabel>Team Skill Rating</StatLabel>
                         <StatNumber>{optimalTeamData.team2Rating.toFixed(1)}</StatNumber>
@@ -536,4 +533,4 @@ export const OptimalTeams = () => {
       )}
     </Box>
   );
-}; 
+};

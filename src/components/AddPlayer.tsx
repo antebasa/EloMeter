@@ -1,5 +1,5 @@
-import {useCallback, useState} from 'react';
-import { Box, Button, FormControl, FormLabel, Input, VStack, useToast, Heading, Text, FormErrorMessage, InputGroup, InputLeftElement, Icon, Flex, Alert, AlertIcon, AlertDescription, NumberInput, NumberInputField, NumberInputStepper, NumberIncrementStepper, NumberDecrementStepper } from '@chakra-ui/react';
+import {useState} from 'react';
+import { Box, Button, FormControl, FormLabel, Input, VStack, useToast, Heading, Text, FormErrorMessage, InputGroup, InputLeftElement, Flex, Alert, AlertIcon, } from '@chakra-ui/react';
 import { supabase } from '../lib/supabase';
 
 export const AddPlayer = () => {
@@ -41,7 +41,7 @@ export const AddPlayer = () => {
       setLoading(true);
 
       // Insert new player into the database
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("User")
         .insert({
           name: formData.name.trim(),
@@ -87,21 +87,21 @@ export const AddPlayer = () => {
   return (
     <Box maxWidth="500px" mx="auto" mt={10} p={6} borderRadius="lg" boxShadow="md" bg="white">
       <Heading as="h2" size="lg" mb={6}>Add New Player</Heading>
-      
+
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
           <AlertIcon />
           <Text>{error}</Text>
         </Alert>
       )}
-      
+
       {success && (
         <Alert status="success" mb={4} borderRadius="md">
           <AlertIcon />
           <Text>Player added successfully!</Text>
         </Alert>
       )}
-      
+
       <VStack spacing={4} align="stretch">
         <FormControl isRequired isInvalid={nameError !== ""}>
           <FormLabel>Player Name</FormLabel>
@@ -118,7 +118,7 @@ export const AddPlayer = () => {
           </InputGroup>
           <FormErrorMessage>{nameError}</FormErrorMessage>
         </FormControl>
-        
+
         <FormControl isInvalid={formData.email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)}>
           <FormLabel>Email (optional)</FormLabel>
           <InputGroup>
@@ -135,7 +135,7 @@ export const AddPlayer = () => {
           </InputGroup>
           <FormErrorMessage>Please enter a valid email address.</FormErrorMessage>
         </FormControl>
-        
+
         <Flex justify="space-between" mt={2}>
           <Button
             variant="outline"
@@ -144,7 +144,7 @@ export const AddPlayer = () => {
           >
             Reset
           </Button>
-          
+
           <Button
             colorScheme="blue"
             onClick={handleSubmit}
@@ -155,7 +155,7 @@ export const AddPlayer = () => {
           </Button>
         </Flex>
       </VStack>
-      
+
       <Text fontSize="sm" color="gray.500" mt={4}>
         New players start with a default ELO rating of 1500. Their rating will change as they play matches.
       </Text>

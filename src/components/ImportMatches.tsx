@@ -1,7 +1,4 @@
-import { useState } from 'react';
-import { Button, Box, Text, VStack, Alert, AlertIcon, Progress, useToast } from '@chakra-ui/react';
-import { saveMatch} from '../lib/supabase';
-import { supabase } from '../lib/supabase';
+import {Box, Button, VStack} from '@chakra-ui/react';
 
 // Parse a match string into the required format
 // Format: "Player1/Player2 10-7 Player3/Player4"
@@ -55,7 +52,7 @@ const matches = [
   "2025-05-15 14:58:51*9/1*10-4*8/7",
 ];
 
-async function sleep(ms) {
+async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 export const ImportMatches = () => {

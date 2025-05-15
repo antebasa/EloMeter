@@ -1,15 +1,5 @@
-import { useState } from 'react';
-import type { ReactNode } from 'react';
-import { 
-  Box, 
-  Flex, 
-  VStack, 
-  Text, 
-  Icon,
-  Heading,
-  Divider,
-  useColorModeValue
-} from '@chakra-ui/react';
+import type {ReactNode} from 'react';
+import {Box, Divider, Flex, Heading, Text, VStack} from '@chakra-ui/react';
 
 // Navigation item type
 interface NavItemProps {
@@ -72,7 +62,7 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
       {/* Sidebar */}
       <Box
         w="250px"
-        bg="#1A202C" // Dark background 
+        bg="#1A202C" // Dark background
         borderRight="1px"
         borderRightColor="gray.700"
         py="5"
@@ -84,7 +74,7 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
           <Divider borderColor="gray.700" />
           <Box w="full" pt="5">
             {navItems.map((item) => (
-              <NavItem 
+              <NavItem
                 key={item.name}
                 isActive={activeNavItem === item.name}
                 onClick={() => onNavItemClick(item.name)}
@@ -102,4 +92,4 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
       </Box>
     </Flex>
   );
-}; 
+};

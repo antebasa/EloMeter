@@ -1,42 +1,32 @@
-import { useState, useEffect } from "react";
-import { 
-  Box, 
-  Heading, 
-  Text, 
-  Select, 
-  Flex, 
-  VStack, 
-  HStack, 
-  Badge, 
-  Tag, 
-  Spinner,
+import {useEffect, useState} from "react";
+import {
   Alert,
-  AlertIcon,
-  AlertTitle,
   AlertDescription,
-  Skeleton,
-  SkeletonText,
-  Tabs, 
-  TabList, 
-  TabPanels, 
-  Tab, 
-  TabPanel,
-  Switch,
+  AlertIcon,
+  Badge,
+  Box,
+  Checkbox,
+  Flex,
   FormControl,
-  FormLabel,
-  Checkbox
+  Heading,
+  HStack,
+  Select,
+  Skeleton,
+  Spinner,
+  Text,
+  VStack
 } from "@chakra-ui/react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { getUsers, getPlayerMatchHistory, getPlayerEloHistory } from "../lib/supabase";
-import type { User } from "../lib/supabase";
+import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
+import type {User} from "../lib/supabase";
+import {getPlayerEloHistory, getPlayerMatchHistory, getUsers} from "../lib/supabase";
 
 // Helper function to format dates
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric' 
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
   });
 };
 
@@ -57,14 +47,14 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
   const [showOffenseElo, setShowOffenseElo] = useState<boolean>(true);
   const [showDefenseElo, setShowDefenseElo] = useState<boolean>(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
-  
+  console.log(error)
   useEffect(() => {
     // Load the users when the component mounts
     async function loadUsers() {
       try {
         const fetchedUsers = await getUsers();
         setUsers(fetchedUsers);
-        
+
         // Set the first user as default selected player if there are users
         if (fetchedUsers.length > 0) {
           setSelectedPlayer(fetchedUsers[0].id);
@@ -84,28 +74,28 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
     // Load the player's match and ELO history when the selected player changes
     async function loadPlayerData() {
       if (!selectedPlayer) return;
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         // Get the current player data
         const currentPlayer = users.find(u => u.id === selectedPlayer) || null;
         setCurrentPlayerData(currentPlayer);
-        
+
         const [matches, elo] = await Promise.all([
           getPlayerMatchHistory(selectedPlayer),
           getPlayerEloHistory(selectedPlayer)
         ]);
-        
+
         console.log('Received ELO history data:', elo);
-        
+
         // Check if we got valid data
         if (!elo || !Array.isArray(elo) || elo.length === 0) {
           console.error('No ELO history data received');
           setError('Failed to load ELO history data');
         }
-        
+
         setMatchHistory(matches);
         setEloHistory(elo);
       } catch (err) {
@@ -115,7 +105,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
         setLoading(false);
       }
     }
-    
+
     if (initialLoadComplete) {
       loadPlayerData();
     }
@@ -124,13 +114,13 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
   // Format the chart data - group by date and separate offense/defense
   const chartData = eloHistory && eloHistory.length > 0 ? eloHistory.reduce((acc: any[], item: any) => {
     console.log('Processing ELO history item:', item);
-    
+
     // Format the date for display
     const formattedDate = formatDate(item.x);
-    
+
     // Check if there's already an entry for this date
     const existingEntry = acc.find(entry => entry.name === formattedDate);
-    
+
     if (existingEntry) {
       // Update existing entry with this type of ELO
       if (item.type === 'offense') {
@@ -148,10 +138,10 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
       }
       acc.push(newEntry);
     }
-    
+
     return acc;
   }, []) : [];
-  
+
   // Sort chart data by date
   if (chartData.length > 0) {
     chartData.sort((a: any, b: any): number => {
@@ -160,19 +150,19 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
       return dateA.getTime() - dateB.getTime();
     });
   }
-  
+
   console.log('Final chart data:', chartData);
 
   // Make sure there's a consistent y-axis range for the chart
   let minValue = 1300;
   let maxValue = 1500;
-  
+
   if (eloHistory && eloHistory.length > 0) {
     const allRatings = eloHistory.map(item => item.y);
     minValue = Math.min(...allRatings) - 50;
     maxValue = Math.max(...allRatings) + 50;
   }
-  
+
   const chartYDomain = [minValue, maxValue];
 
   // Handler for player selection change
@@ -207,7 +197,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
       <Flex direction={{ base: "column", md: "row" }} align={{ base: "flex-start", md: "center" }} mb={6}>
         <Heading as="h2" size="lg" flex="1">Player History</Heading>
         <Box maxWidth="300px" w="100%">
-          <Select 
+          <Select
             value={selectedPlayer === null ? "" : selectedPlayer.toString()}
             onChange={handlePlayerChange}
             placeholder="Select player"
@@ -220,14 +210,14 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
           </Select>
         </Box>
       </Flex>
-      
+
       {currentPlayerData && !loading && (
-        <Flex 
-          mb={6} 
-          p={4} 
-          bg="blue.50" 
-          borderRadius="md" 
-          align="center" 
+        <Flex
+          mb={6}
+          p={4}
+          bg="blue.50"
+          borderRadius="md"
+          align="center"
           justify="space-between"
           direction={{ base: "column", sm: "row" }}
         >
@@ -272,14 +262,14 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
           </Box>
         </Flex>
       )}
-      
+
       {loading ? (
         <>
           <Box mb={8}>
             <Heading as="h3" size="md" mb={4}>ELO Rating History</Heading>
             <Skeleton height="300px" borderRadius="md" />
           </Box>
-          
+
           <Box>
             <Heading as="h3" size="md" mb={4}>Recent Matches</Heading>
             <VStack spacing={2} align="stretch">
@@ -296,9 +286,9 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
               <Heading as="h3" size="md">ELO Rating History</Heading>
               <HStack spacing={3}>
                 <FormControl display="flex" alignItems="center" width="auto">
-                  <Checkbox 
-                    id="show-offense-elo" 
-                    isChecked={showOffenseElo} 
+                  <Checkbox
+                    id="show-offense-elo"
+                    isChecked={showOffenseElo}
                     onChange={() => setShowOffenseElo(!showOffenseElo)}
                     colorScheme="purple"
                   >
@@ -306,9 +296,9 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                   </Checkbox>
                 </FormControl>
                 <FormControl display="flex" alignItems="center" width="auto">
-                  <Checkbox 
-                    id="show-defense-elo" 
-                    isChecked={showDefenseElo} 
+                  <Checkbox
+                    id="show-defense-elo"
+                    isChecked={showDefenseElo}
                     onChange={() => setShowDefenseElo(!showDefenseElo)}
                     colorScheme="blue"
                   >
@@ -317,7 +307,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                 </FormControl>
               </HStack>
             </Flex>
-            
+
             {eloHistory.length === 0 ? (
               <Alert status="info" borderRadius="md">
                 <AlertIcon />
@@ -333,33 +323,33 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis domain={chartYDomain} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: "#2D3748", 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#2D3748",
                         borderColor: "#4A5568",
-                        color: "white" 
-                      }} 
+                        color: "white"
+                      }}
                     />
                     <Legend />
-                    
+
                     {showOffenseElo && (
-                      <Line 
-                        type="monotone" 
-                        dataKey="offenseELO" 
+                      <Line
+                        type="monotone"
+                        dataKey="offenseELO"
                         name="Offense ELO"
-                        stroke="#8884d8" 
+                        stroke="#8884d8"
                         strokeWidth={3}
                         dot={{ r: 6 }}
                         activeDot={{ r: 8 }}
                       />
                     )}
-                    
+
                     {showDefenseElo && (
-                      <Line 
-                        type="monotone" 
-                        dataKey="defenseELO" 
+                      <Line
+                        type="monotone"
+                        dataKey="defenseELO"
                         name="Defense ELO"
-                        stroke="#3182CE" 
+                        stroke="#3182CE"
                         strokeWidth={3}
                         dot={{ r: 6 }}
                         activeDot={{ r: 8 }}
@@ -370,7 +360,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
               </Box>
             )}
           </Box>
-          
+
           <Box>
             <Heading as="h3" size="md" mb={4}>Recent Matches</Heading>
             {matchHistory.length === 0 ? (
@@ -384,13 +374,12 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                   const result = match.result; // Win, Draw, or Loss
                   const isWin = result === "Win";
                   const isDraw = result === "Draw";
-                  const isLoss = result === "Loss";
-                  
+
                   return (
-                    <Flex 
-                      key={index} 
-                      p={3} 
-                      borderRadius="md" 
+                    <Flex
+                      key={index}
+                      p={3}
+                      borderRadius="md"
                       bg={isWin ? "blue.50" : isDraw ? "gray.100" : "gray.50"}
                       borderLeft={`4px solid ${isWin ? "#3182CE" : isDraw ? "#718096" : "#A0AEC0"}`}
                       justify="space-between"
@@ -412,14 +401,14 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                         </Text>
                         <Text fontSize="sm" color="gray.600">{formatDate(match.date)}</Text>
                       </VStack>
-                      
+
                       <HStack>
                         <Badge colorScheme={isWin ? "green" : isDraw ? "gray" : "red"}>
                           {result}
                         </Badge>
                         <Text fontWeight="medium">{match.score}</Text>
-                        <Text 
-                          color={(match.eloChange > 0) ? "green.500" : "red.500"} 
+                        <Text
+                          color={(match.eloChange > 0) ? "green.500" : "red.500"}
                           fontWeight="bold"
                         >
                           {match.eloChange > 0 ? `+${match.eloChange}` : match.eloChange}
@@ -435,4 +424,4 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
       )}
     </Box>
   );
-}; 
+};

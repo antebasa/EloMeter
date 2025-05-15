@@ -1,45 +1,44 @@
-import { useState, useEffect } from "react";
-import { 
-  Box, 
-  Heading, 
-  Text, 
-  Table, 
-  Thead, 
-  Tbody, 
-  Tr, 
-  Th, 
-  Td, 
-  Input, 
-  InputGroup, 
-  InputLeftElement,
-  Badge,
-  Flex,
-  Spinner,
-  HStack,
-  Icon,
-  useColorModeValue,
-  Avatar,
+import {useEffect, useState} from "react";
+import {
   Alert,
+  AlertDescription,
   AlertIcon,
   AlertTitle,
-  AlertDescription,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
+  Avatar,
+  Badge,
+  Box,
+  Flex,
+  Heading,
+  HStack,
+  Input,
+  InputGroup,
+  InputLeftElement,
   Popover,
-  PopoverTrigger,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
   PopoverContent,
   PopoverHeader,
-  PopoverBody,
-  PopoverArrow,
-  PopoverCloseButton,
-  Portal
+  PopoverTrigger,
+  Portal,
+  Spinner,
+  Tab,
+  Table,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useColorModeValue
 } from "@chakra-ui/react";
-import { SearchIcon } from '@chakra-ui/icons';
-import { getUsers, getPlayerMatchHistory } from "../lib/supabase";
-import type { User as SupabaseUser } from "../lib/supabase";
+import {SearchIcon} from '@chakra-ui/icons';
+import type {User as SupabaseUser} from "../lib/supabase";
+import {getPlayerMatchHistory, getUsers} from "../lib/supabase";
 
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
@@ -61,7 +60,7 @@ interface MatchHistoryDisplayEntry {
   teammate: string;
   opponents: string;
   // For popover, we need to know the player's team ID in this match and the match's white/blue team IDs
-  myTeamIdInMatch: number; 
+  myTeamIdInMatch: number;
   matchWhiteTeamId: number;
   matchBlueTeamId: number;
 }
@@ -108,20 +107,20 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
         setLoading(true);
         setError(null);
         const fetchedUsers: User[] = await getUsers();
-        
+
         const playersWithRecentForm = await Promise.all(
           fetchedUsers.map(async (user) => {
-            if (!user.id) return { 
-              ...user, 
-              winPercentage: 0, 
+            if (!user.id) return {
+              ...user,
+              winPercentage: 0,
               recentFormDetailed: []
             };
-            
+
             try {
               // getPlayerMatchHistory now returns an array of objects that should somewhat match MatchHistoryDisplayEntry
               // We need to ensure the fields required by MatchHistoryDisplayEntry are present or mapped.
               const rawMatchHistory = await getPlayerMatchHistory(user.id);
-              
+
               const processedMatchHistory: MatchHistoryDisplayEntry[] = rawMatchHistory.map((match: any) => ({
                 id: match.id, // This is PlayerMatchStats.id
                 match_db_id: match.match_db_id,
@@ -133,17 +132,17 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 newElo: match.newElo,
                 teammate: match.teammate,
                 opponents: match.opponents,
-                myTeamIdInMatch: match.player_team_id_in_match, 
-                matchWhiteTeamId: match.match_details_white_team_id, 
+                myTeamIdInMatch: match.player_team_id_in_match,
+                matchWhiteTeamId: match.match_details_white_team_id,
                 matchBlueTeamId: match.match_details_blue_team_id,
               }));
-              
+
               const wins = user.wins || 0;
               const played = user.played || 0;
               const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
-              
+
               const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.slice(0, 5);
-              
+
               return {
                 ...user,
                 winPercentage,
@@ -151,7 +150,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               };
             } catch (fetchError) {
               console.error(`Error fetching/processing match history for player ${user.id}:`, fetchError);
-              return { 
+              return {
                 ...user,
                 winPercentage: 0,
                 recentFormDetailed: []
@@ -159,14 +158,14 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
             }
           })
         );
-        
+
         let sortedPlayersList = [...playersWithRecentForm];
-        if (activeTab === 0) { 
+        if (activeTab === 0) {
           sortedPlayersList.sort((a, b) => (b.elo_offense || 0) - (a.elo_offense || 0));
-        } else { 
+        } else {
           sortedPlayersList.sort((a, b) => (b.elo_defense || 0) - (a.elo_defense || 0));
         }
-        
+
         setPlayers(sortedPlayersList);
         setFilteredPlayers(sortedPlayersList);
       } catch (err) {
@@ -178,13 +177,13 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     }
 
     loadUsers();
-  }, []); 
+  }, []);
 
   useEffect(() => {
     if (searchTerm.trim() === '') {
       setFilteredPlayers(players);
     } else {
-      const filtered = players.filter(player => 
+      const filtered = players.filter(player =>
         player.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredPlayers(filtered);
@@ -198,11 +197,11 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     }
 
     setSortConfig({ key, direction });
-    
+
     const sorted = [...filteredPlayers].sort((a, b) => {
-      const aValue = a[key] as any; 
-      const bValue = b[key] as any; 
-      
+      const aValue = a[key] as any;
+      const bValue = b[key] as any;
+
       const valA = aValue === null || aValue === undefined ? (direction === 'ascending' ? Infinity : -Infinity) : aValue;
       const valB = bValue === null || bValue === undefined ? (direction === 'ascending' ? Infinity : -Infinity) : bValue;
 
@@ -225,13 +224,13 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     const sortedPlayersList = [...players].sort((a, b) => {
         const aValue = a[keyToSort] || 0;
         const bValue = b[keyToSort] || 0;
-        return bValue - aValue; 
+        return bValue - aValue;
     });
-    setPlayers(sortedPlayersList); 
+    setPlayers(sortedPlayersList);
     if (searchTerm.trim() === '') {
       setFilteredPlayers(sortedPlayersList);
     } else {
-      const filtered = sortedPlayersList.filter(player => 
+      const filtered = sortedPlayersList.filter(player =>
         player.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredPlayers(filtered);
@@ -247,13 +246,13 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     if (!formDetailed || formDetailed.length === 0) {
       return <Text fontSize="sm" color={noRecentMatchesColor}>No recent matches</Text>;
     }
-    
+
     return (
       <HStack spacing={1}>
         {formDetailed.map((match, index) => {
           const resultChar = match.result === 'Win' ? 'W' : match.result === 'Draw' ? 'D' : 'L';
           const badgeColorScheme = match.result === 'Win' ? 'green' : match.result === 'Draw' ? 'yellow' : 'red';
-          
+
           let playerTeamColor = 'N/A';
           if (match.myTeamIdInMatch && match.matchWhiteTeamId && match.myTeamIdInMatch === match.matchWhiteTeamId) {
             playerTeamColor = 'White';
@@ -266,9 +265,9 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
           return (
             <Popover key={`${match.match_db_id}-${index}`} trigger="hover" placement="top" isLazy>
               <PopoverTrigger>
-                <Badge 
-                  colorScheme={badgeColorScheme} 
-                  variant="solid" 
+                <Badge
+                  colorScheme={badgeColorScheme}
+                  variant="solid"
                   fontSize="xs"
                   borderRadius="full"
                   px={2}
@@ -278,8 +277,8 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 </Badge>
               </PopoverTrigger>
               <Portal>
-                <PopoverContent zIndex="tooltip" minWidth="300px" boxShadow="lg" 
-                                bg={popoverBg} 
+                <PopoverContent zIndex="tooltip" minWidth="300px" boxShadow="lg"
+                                bg={popoverBg}
                                 color={popoverColor}>
                   <PopoverArrow bg={popoverArrowBg} />
                   <PopoverCloseButton />
@@ -289,7 +288,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                   <PopoverBody fontSize="sm">
                     <Text><strong>Your Team ({playerTeamColor}):</strong> {match.teammate}</Text>
                     <Text><strong>Opponent:</strong> {match.opponents}</Text>
-                    <Text><strong>Score:</strong> {match.score} 
+                    <Text><strong>Score:</strong> {match.score}
                       <Text as="span" fontWeight="bold" color={`${badgeColorScheme}.500`}> ({match.result})</Text>
                     </Text>
                     <Text><strong>ELO Change:</strong> {eloChangeDisplay} (New: {match.newElo})</Text>
@@ -323,18 +322,18 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
       </Alert>
     );
   }
-  
+
   return (
     <Box p={{ base: 2, md: 5 }}>
       <Heading as="h1" size="xl" mb={6} textAlign="center" color={headingColor}>Player Rankings</Heading>
-      
+
       <InputGroup mb={6} size="lg">
         <InputLeftElement pointerEvents="none">
           <SearchIcon color={searchIconColor} />
         </InputLeftElement>
-        <Input 
-          placeholder="Search players..." 
-          value={searchTerm} 
+        <Input
+          placeholder="Search players..."
+          value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           borderRadius="full"
           variant="filled"
@@ -347,7 +346,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
           <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Offense Rankings</Tab>
           <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Defense Rankings</Tab>
         </TabList>
-        
+
         <TabPanels>
           <TabPanel p={0}>
             <Box overflowX="auto">
@@ -364,11 +363,11 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 </Thead>
                 <Tbody>
                   {filteredPlayers.map(player => (
-                    <Tr 
-                      key={player.id} 
-                      _hover={{ bg: rowHoverBg }} 
-                      transition="background-color 0.2s ease-in-out" 
-                      cursor="pointer" 
+                    <Tr
+                      key={player.id}
+                      _hover={{ bg: rowHoverBg }}
+                      transition="background-color 0.2s ease-in-out"
+                      cursor="pointer"
                       onClick={() => onPlayerClick(player.id)}
                     >
                       <Td>
@@ -388,7 +387,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               </Table>
             </Box>
           </TabPanel>
-          
+
           <TabPanel p={0}>
             <Box overflowX="auto">
               <Table variant="simple" size="md" bg={tableBg} boxShadow="md" borderRadius="md">
@@ -404,11 +403,11 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 </Thead>
                 <Tbody>
                   {filteredPlayers.map(player => (
-                    <Tr 
-                      key={player.id} 
-                      _hover={{ bg: rowHoverBg }} 
-                      transition="background-color 0.2s ease-in-out" 
-                      cursor="pointer" 
+                    <Tr
+                      key={player.id}
+                      _hover={{ bg: rowHoverBg }}
+                      transition="background-color 0.2s ease-in-out"
+                      cursor="pointer"
                       onClick={() => onPlayerClick(player.id)}
                     >
                       <Td>
@@ -438,4 +437,4 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
       )}
     </Box>
   );
-}; 
+};
