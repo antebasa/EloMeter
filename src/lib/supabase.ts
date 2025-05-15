@@ -5,16 +5,16 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Constants from Python's elo_tracker.py
+// Constants
 const DEFAULT_ELO = 1400;
-const K_FACTOR = 80; // Higher than standard 32 for more volatility as in the Python script
-const SCORE_DIFF_MULTIPLIER = 0.15; // From Python script
+const K_FACTOR = 80;
+const SCORE_DIFF_MULTIPLIER = 0.15;
 
 export interface User {
   id: number;
   name: string;
   email?: string;
-  created_at?: string;
+  created_at?: string; // This is timestamp with time zone in DB
   goals?: number;
   conceded?: number;
   wins?: number;
@@ -24,10 +24,10 @@ export interface User {
   elo_defense?: number;
 }
 
-export enum TeamColor {
-  BLUE = 'blue',
-  WHITE = 'white'
-}
+// export enum TeamColor { // No longer used directly in Team table for match context
+//   BLUE = 'blue',
+//   WHITE = 'white'
+// }
 
 export interface MatchData {
   team1Defense: string; // user_id
@@ -36,11 +36,44 @@ export interface MatchData {
   team2Offense: string; // user_id
   team1Score: number;
   team2Score: number;
-  team1DefenseGoals?: number; // Optional goals scored by team1 defense player
-  team1OffenseGoals?: number; // Optional goals scored by team1 offense player
-  team2DefenseGoals?: number; // Optional goals scored by team2 defense player
-  team2OffenseGoals?: number; // Optional goals scored by team2 offense player
-  date?: Date; // Optional goals scored by team2 offense player
+  date?: string | Date; // User added this for custom match date
+  // Optional individual goals not directly used in this refactor, team scores are primary
+  team1DefenseGoals?: number;
+  team1OffenseGoals?: number;
+  team2DefenseGoals?: number;
+  team2OffenseGoals?: number;
+}
+
+interface JoinedMatchDetails {
+    id: number;
+    created_at: string;
+    white_team_id: number;
+    blue_team_id: number;
+    team_white_score: number;
+    team_blue_score: number;
+}
+
+interface JoinedTeamDetails {
+    id: number;
+    user1_id: number;
+    user2_id: number;
+    name?: string;
+}
+
+// This is the type for entries coming from the PlayerMatchStats table itself,
+// with foreign keys resolved to actual objects due to joins.
+interface PlayerMatchStatsQueryResultEntry {
+    id: number;
+    user_id: number;
+    created_at: string; // This is the created_at from PlayerMatchStats, should be match date
+    scored: number;
+    conceded: number;
+    old_elo: number;
+    new_elo: number;
+    old_elo_offense: number;
+    new_elo_offense: number;
+    match_id: JoinedMatchDetails; // !inner join ensures this is not null
+    team_id: JoinedTeamDetails;   // !inner join ensures this is not null
 }
 
 // Function to get all users
@@ -54,99 +87,127 @@ export async function getUsers(): Promise<User[]> {
     console.error('Error fetching users:', error);
     return [];
   }
-
   return data || [];
 }
 
-// Python script's ELO calculation functions
-
-// Calculate the expected score based on ELO ratings
+// ELO calculation functions (no change needed here)
 function calculateExpectedScore(playerElo: number, opponentElo: number): number {
   return 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
 }
 
-// Update ELO rating based on expected and actual scores
 function updateElo(playerElo: number, expectedScore: number, actualScore: number, scoreDiff: number | null = null): number {
   let baseChange = K_FACTOR * (actualScore - expectedScore);
-
-  // Add score difference impact for more dynamic changes
   if (scoreDiff !== null) {
     const scoreImpact = Math.min(Math.abs(scoreDiff) * SCORE_DIFF_MULTIPLIER, 1.0);
     baseChange *= (1 + scoreImpact);
   }
-
   return playerElo + baseChange;
 }
 
-// Save match data to Supabase
+// Helper to get or create a team
+async function getOrCreateTeam(user1Id: number, user2Id: number, matchDate?: string | Date, teamName?: string): Promise<number> {
+  const u1 = Math.min(user1Id, user2Id);
+  const u2 = Math.max(user1Id, user2Id);
+
+  const { data: existingTeams, error: fetchError } = await supabase
+    .from('Team')
+    .select('id')
+    .eq('user1_id', u1)
+    .eq('user2_id', u2)
+    .limit(1);
+
+  if (fetchError) {
+    console.error('Error fetching team:', fetchError);
+    throw fetchError;
+  }
+
+  if (existingTeams && existingTeams.length > 0) {
+    return existingTeams[0].id;
+  } else {
+    const newTeamData: any = { user1_id: u1, user2_id: u2 };
+    if (teamName) newTeamData.name = teamName;
+
+    // DB schema for Team.created_at is 'date'
+    newTeamData.created_at = matchDate ? new Date(matchDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
+
+    const { data: newTeam, error: insertError } = await supabase
+      .from('Team')
+      .insert(newTeamData)
+      .select('id')
+      .single();
+
+    if (insertError || !newTeam) {
+      console.error('Error creating team:', insertError);
+      throw insertError || new Error('Failed to create team and retrieve ID');
+    }
+    return newTeam.id;
+  }
+}
+
 export async function saveMatch(matchData: MatchData): Promise<{ success: boolean; error?: any }> {
   try {
-    // Get current user data to have their ELO scores
-    const { data: users, error: getUsersError } = await supabase
-      .from('User')
-      .select('id, elo_offense, elo_defense, goals, conceded, wins, losses, played')
-      .in('id', [
-        parseInt(matchData.team1Defense),
-        parseInt(matchData.team1Offense),
-        parseInt(matchData.team2Defense),
-        parseInt(matchData.team2Offense)
-      ]);
+    const playerIds = [
+      parseInt(matchData.team1Defense),
+      parseInt(matchData.team1Offense),
+      parseInt(matchData.team2Defense),
+      parseInt(matchData.team2Offense)
+    ].filter((id, index, self) => self.indexOf(id) === index); // Ensure unique IDs
 
-    if (getUsersError || !users) {
-      console.error('Error fetching user data:', getUsersError);
-      return { success: false, error: getUsersError };
+    const { data: usersData, error: getUsersError } = await supabase
+      .from('User')
+      .select('id, name, elo_offense, elo_defense, goals, conceded, wins, losses, played') // Added name here
+      .in('id', playerIds);
+
+    if (getUsersError || !usersData || usersData.length < playerIds.length) {
+      console.error('Error fetching user data or not all users found:', getUsersError, usersData);
+      return { success: false, error: getUsersError || 'Not all users found' };
     }
 
-    // Create user lookup object for easier access
-    const userMap = users.reduce((acc, user) => {
-      acc[user.id] = user;
+    const userMap = usersData.reduce((acc, user) => {
+      acc[user.id] = user as User; // Cast to User to satisfy type, ensure all fields are present
       return acc;
-    }, {} as Record<number, any>);
+    }, {} as Record<number, User>);
 
-    // Get player IDs
-    const team1DefenseId = parseInt(matchData.team1Defense);
-    const team1OffenseId = parseInt(matchData.team1Offense);
-    const team2DefenseId = parseInt(matchData.team2Defense);
-    const team2OffenseId = parseInt(matchData.team2Offense);
+    const t1dId = parseInt(matchData.team1Defense);
+    const t1oId = parseInt(matchData.team1Offense);
+    const t2dId = parseInt(matchData.team2Defense);
+    const t2oId = parseInt(matchData.team2Offense);
 
-    // Get player ELOs
-    const team1DefenseDefElo = userMap[team1DefenseId]?.elo_defense || DEFAULT_ELO;
-    const team1OffenseOffElo = userMap[team1OffenseId]?.elo_offense || DEFAULT_ELO;
-    const team2DefenseDefElo = userMap[team2DefenseId]?.elo_defense || DEFAULT_ELO;
-    const team2OffenseOffElo = userMap[team2OffenseId]?.elo_offense || DEFAULT_ELO;
+    const matchDateToUse = matchData.date ? new Date(matchData.date) : new Date();
+    const matchDateString = matchDateToUse.toISOString().split('T')[0];
 
-    // Calculate team ELOs (average of defense_elo and offense_elo for respective players)
-    const team1Elo = (team1DefenseDefElo + team1OffenseOffElo) / 2;
-    const team2Elo = (team2DefenseDefElo + team2OffenseOffElo) / 2;
+    const whiteTeamId = await getOrCreateTeam(t1dId, t1oId, matchDateToUse);
+    const blueTeamId = await getOrCreateTeam(t2dId, t2oId, matchDateToUse);
 
-    // Calculate expected scores
-    const team1Expected = calculateExpectedScore(team1Elo, team2Elo);
-    const team2Expected = 1 - team1Expected;
+    const t1dDefElo = userMap[t1dId]?.elo_defense || DEFAULT_ELO;
+    const t1oOffElo = userMap[t1oId]?.elo_offense || DEFAULT_ELO;
+    const t2dDefElo = userMap[t2dId]?.elo_defense || DEFAULT_ELO;
+    const t2oOffElo = userMap[t2oId]?.elo_offense || DEFAULT_ELO;
 
-    // Calculate actual scores (normalized to sum to 1)
-    const totalScore = matchData.team1Score + matchData.team2Score;
-    const team1Actual = matchData.team1Score / totalScore;
-    const team2Actual = matchData.team2Score / totalScore;
+    const team1Elo = (t1dDefElo + t1oOffElo) / 2;
+    const team2Elo = (t2dDefElo + t2oOffElo) / 2;
 
-    // Calculate score difference
+    const t1Expected = calculateExpectedScore(team1Elo, team2Elo);
+    const t2Expected = 1 - t1Expected;
+    const totalScoreValue = matchData.team1Score + matchData.team2Score;
+    const t1Actual = totalScoreValue > 0 ? matchData.team1Score / totalScoreValue : 0.5;
+    const t2Actual = totalScoreValue > 0 ? matchData.team2Score / totalScoreValue : 0.5;
     const scoreDiff = matchData.team1Score - matchData.team2Score;
 
-    // Update ELO ratings with score difference impact
-    const newTeam1DefenseDefElo = Math.round(updateElo(team1DefenseDefElo, team1Expected, team1Actual, scoreDiff));
-    const newTeam1OffenseOffElo = Math.round(updateElo(team1OffenseOffElo, team1Expected, team1Actual, scoreDiff));
-    const newTeam2DefenseDefElo = Math.round(updateElo(team2DefenseDefElo, team2Expected, team2Actual, -scoreDiff));
-    const newTeam2OffenseOffElo = Math.round(updateElo(team2OffenseOffElo, team2Expected, team2Actual, -scoreDiff));
+    const newT1dDefElo = Math.round(updateElo(t1dDefElo, t1Expected, t1Actual, scoreDiff));
+    const newT1oOffElo = Math.round(updateElo(t1oOffElo, t1Expected, t1Actual, scoreDiff));
+    const newT2dDefElo = Math.round(updateElo(t2dDefElo, t2Expected, t2Actual, -scoreDiff));
+    const newT2oOffElo = Math.round(updateElo(t2oOffElo, t2Expected, t2Actual, -scoreDiff));
 
-    // Determine the winner
-    const team1Won = matchData.team1Score > matchData.team2Score;
-
-    // 1. Insert new Match
     const { data: matchInsertData, error: matchInsertError } = await supabase
       .from('Match')
       .insert({
+        white_team_id: whiteTeamId,
+        blue_team_id: blueTeamId,
         team_white_score: matchData.team1Score,
         team_blue_score: matchData.team2Score,
-        created_at: matchData.date ? new Date(matchData.date) : new Date()
+        created_at: matchDateString
       })
       .select('id')
       .single();
@@ -155,139 +216,77 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       console.error('Error inserting match:', matchInsertError);
       return { success: false, error: matchInsertError };
     }
-
     const matchId = matchInsertData.id;
 
-    // 2. Insert WHITE team
-    const { data: team1Data, error: team1Error } = await supabase
-      .from('Team')
-      .insert({
-        match_id: matchId,
-        color: TeamColor.WHITE,
-        created_at: matchData.date ? new Date(matchData.date) : new Date()
-      })
-      .select('id')
-      .single();
-
-    if (team1Error || !team1Data) {
-      console.error('Error inserting team 1:', team1Error);
-      return { success: false, error: team1Error };
-    }
-
-    // 3. Insert BLUE team
-    const { data: team2Data, error: team2Error } = await supabase
-      .from('Team')
-      .insert({
-        match_id: matchId,
-        color: TeamColor.BLUE,
-        created_at: matchData.date ? new Date(matchData.date) : new Date()
-      })
-      .select('id')
-      .single();
-
-    if (team2Error || !team2Data) {
-      console.error('Error inserting team 2:', team2Error);
-      return { success: false, error: team2Error };
-    }
-
-    // 4. Insert Team Players - both players on the same team get the same goals
-    const teamPlayersData = [
-      // White team - Defense
+    const playerMatchStatsData = [
       {
-        team_id: team1Data.id,
-        user_id: team1DefenseId,
-        scored: matchData.team1Score, // Same score for both team players
-        conceded: matchData.team2Score,
-        old_elo: team1DefenseDefElo,
-        new_elo: newTeam1DefenseDefElo,
-        created_at: matchData.date ? new Date(matchData.date) : new Date()
+        match_id: matchId, user_id: t1dId, team_id: whiteTeamId,
+        scored: matchData.team1Score, conceded: matchData.team2Score,
+        old_elo: t1dDefElo, new_elo: newT1dDefElo,
+        old_elo_offense: userMap[t1dId]?.elo_offense || DEFAULT_ELO,
+        new_elo_offense: userMap[t1dId]?.elo_offense || DEFAULT_ELO,
+        created_at: matchDateString
       },
-      // White team - Offense
       {
-        team_id: team1Data.id,
-        user_id: team1OffenseId,
-        scored: matchData.team1Score, // Same score for both team players
-        conceded: matchData.team2Score,
-        old_elo: team1OffenseOffElo,
-        new_elo: newTeam1OffenseOffElo,
-        created_at: matchData.date ? new Date(matchData.date) : new Date()
+        match_id: matchId, user_id: t1oId, team_id: whiteTeamId,
+        scored: matchData.team1Score, conceded: matchData.team2Score,
+        old_elo: userMap[t1oId]?.elo_defense || DEFAULT_ELO,
+        new_elo: userMap[t1oId]?.elo_defense || DEFAULT_ELO,
+        old_elo_offense: t1oOffElo, new_elo_offense: newT1oOffElo,
+        created_at: matchDateString
       },
-      // Blue team - Defense
       {
-        team_id: team2Data.id,
-        user_id: team2DefenseId,
-        scored: matchData.team2Score, // Same score for both team players
-        conceded: matchData.team1Score,
-        old_elo: team2DefenseDefElo,
-        new_elo: newTeam2DefenseDefElo,
-        created_at: matchData.date ? new Date(matchData.date) : new Date()
+        match_id: matchId, user_id: t2dId, team_id: blueTeamId,
+        scored: matchData.team2Score, conceded: matchData.team1Score,
+        old_elo: t2dDefElo, new_elo: newT2dDefElo,
+        old_elo_offense: userMap[t2dId]?.elo_offense || DEFAULT_ELO,
+        new_elo_offense: userMap[t2dId]?.elo_offense || DEFAULT_ELO,
+        created_at: matchDateString
       },
-      // Blue team - Offense
       {
-        team_id: team2Data.id,
-        user_id: team2OffenseId,
-        scored: matchData.team2Score, // Same score for both team players
-        conceded: matchData.team1Score,
-        old_elo: team2OffenseOffElo,
-        new_elo: newTeam2OffenseOffElo,
-        created_at: matchData.date ? new Date(matchData.date) : new Date()
+        match_id: matchId, user_id: t2oId, team_id: blueTeamId,
+        scored: matchData.team2Score, conceded: matchData.team1Score,
+        old_elo: userMap[t2oId]?.elo_defense || DEFAULT_ELO,
+        new_elo: userMap[t2oId]?.elo_defense || DEFAULT_ELO,
+        old_elo_offense: t2oOffElo, new_elo_offense: newT2oOffElo,
+        created_at: matchDateString
       }
     ];
 
-    const { error: teamPlayersError } = await supabase
-      .from('TeamPlayer')
-      .insert(teamPlayersData);
-
-    if (teamPlayersError) {
-      console.error('Error inserting team players:', teamPlayersError);
-      return { success: false, error: teamPlayersError };
+    const { error: pmsError } = await supabase.from('PlayerMatchStats').insert(playerMatchStatsData);
+    if (pmsError) {
+      console.error('Error inserting player match stats:', pmsError);
+      return { success: false, error: pmsError };
     }
 
-    // 5. Update User stats
-    const updateUser1Defense = {
-      elo_defense: newTeam1DefenseDefElo,
-      goals: (userMap[team1DefenseId]?.goals || 0) + matchData.team1Score, // Full team score
-      conceded: (userMap[team1DefenseId]?.conceded || 0) + matchData.team2Score,
-      wins: (userMap[team1DefenseId]?.wins || 0) + (team1Won ? 1 : 0),
-      losses: (userMap[team1DefenseId]?.losses || 0) + (team1Won ? 0 : 1),
-      played: (userMap[team1DefenseId]?.played || 0) + 1
-    };
+    const team1Won = matchData.team1Score > matchData.team2Score;
+    const isDraw = matchData.team1Score === matchData.team2Score;
 
-    const updateUser1Offense = {
-      elo_offense: newTeam1OffenseOffElo,
-      goals: (userMap[team1OffenseId]?.goals || 0) + matchData.team1Score, // Full team score
-      conceded: (userMap[team1OffenseId]?.conceded || 0) + matchData.team2Score,
-      wins: (userMap[team1OffenseId]?.wins || 0) + (team1Won ? 1 : 0),
-      losses: (userMap[team1OffenseId]?.losses || 0) + (team1Won ? 0 : 1),
-      played: (userMap[team1OffenseId]?.played || 0) + 1
-    };
+    const userUpdatesPayload = [
+        { id: t1dId, elo_defense: newT1dDefElo, goals_scored: matchData.team1Score, goals_conceded: matchData.team2Score, won: team1Won, isDraw: isDraw },
+        { id: t1oId, elo_offense: newT1oOffElo, goals_scored: matchData.team1Score, goals_conceded: matchData.team2Score, won: team1Won, isDraw: isDraw },
+        { id: t2dId, elo_defense: newT2dDefElo, goals_scored: matchData.team2Score, goals_conceded: matchData.team1Score, won: !team1Won && !isDraw, isDraw: isDraw },
+        { id: t2oId, elo_offense: newT2oOffElo, goals_scored: matchData.team2Score, goals_conceded: matchData.team1Score, won: !team1Won && !isDraw, isDraw: isDraw }
+    ];
 
-    const updateUser2Defense = {
-      elo_defense: newTeam2DefenseDefElo,
-      goals: (userMap[team2DefenseId]?.goals || 0) + matchData.team2Score, // Full team score
-      conceded: (userMap[team2DefenseId]?.conceded || 0) + matchData.team1Score,
-      wins: (userMap[team2DefenseId]?.wins || 0) + (team1Won ? 0 : 1),
-      losses: (userMap[team2DefenseId]?.losses || 0) + (team1Won ? 1 : 0),
-      played: (userMap[team2DefenseId]?.played || 0) + 1
-    };
+    for (const update of userUpdatesPayload) {
+      const currentUser = userMap[update.id];
+      if (!currentUser) continue; // Should not happen if initial fetch was correct
+      const userStatUpdate: Partial<User> = {
+        played: (currentUser.played || 0) + 1,
+        goals: (currentUser.goals || 0) + update.goals_scored,
+        conceded: (currentUser.conceded || 0) + update.goals_conceded,
+        wins: (currentUser.wins || 0) + (update.won ? 1 : 0),
+        losses: (currentUser.losses || 0) + (!update.won && !update.isDraw ? 1 : 0),
+      };
+      if (update.elo_defense !== undefined) userStatUpdate.elo_defense = update.elo_defense;
+      if (update.elo_offense !== undefined) userStatUpdate.elo_offense = update.elo_offense;
 
-    const updateUser2Offense = {
-      elo_offense: newTeam2OffenseOffElo,
-      goals: (userMap[team2OffenseId]?.goals || 0) + matchData.team2Score, // Full team score
-      conceded: (userMap[team2OffenseId]?.conceded || 0) + matchData.team1Score,
-      wins: (userMap[team2OffenseId]?.wins || 0) + (team1Won ? 0 : 1),
-      losses: (userMap[team2OffenseId]?.losses || 0) + (team1Won ? 1 : 0),
-      played: (userMap[team2OffenseId]?.played || 0) + 1
-    };
-
-    // Update users in parallel
-    await Promise.all([
-      supabase.from('User').update(updateUser1Defense).eq('id', team1DefenseId),
-      supabase.from('User').update(updateUser1Offense).eq('id', team1OffenseId),
-      supabase.from('User').update(updateUser2Defense).eq('id', team2DefenseId),
-      supabase.from('User').update(updateUser2Offense).eq('id', team2OffenseId)
-    ]);
-
+      const { error: userUpdateError } = await supabase.from('User').update(userStatUpdate).eq('id', update.id);
+      if (userUpdateError) {
+        console.error(`Error updating user ${update.id}:`, userUpdateError);
+      }
+    }
     return { success: true };
   } catch (error) {
     console.error('Error saving match:', error);
@@ -295,282 +294,188 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
   }
 }
 
-// Function to get a player's match history
 export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
-  // First get all the teams the player was part of
-  const { data: playerTeamPlayerEntries, error: playerTeamPlayersError } = await supabase
-    .from('TeamPlayer')
-    .select('id, team_id, old_elo, new_elo, scored, conceded, created_at')
+  const { data: playerStatsEntries, error: pmsError } = await supabase
+    .from('PlayerMatchStats')
+    .select(`
+      id, user_id, created_at, scored, conceded, old_elo, new_elo, old_elo_offense, new_elo_offense, 
+      match_id!inner ( id, created_at, white_team_id, blue_team_id, team_white_score, team_blue_score ),
+      team_id!inner ( id, user1_id, user2_id, name )
+    `)
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { foreignTable: 'match_id', ascending: false });
 
-  if (playerTeamPlayersError || !playerTeamPlayerEntries) {
-    console.error('Error fetching team players for user:', playerTeamPlayersError);
+  if (pmsError || !playerStatsEntries) {
+    console.error('Error fetching player match stats:', pmsError);
     return [];
   }
 
-  if (playerTeamPlayerEntries.length === 0) {
-    return [];
+  const typedPlayerStatsEntries = playerStatsEntries as unknown as PlayerMatchStatsQueryResultEntry[];
+  if (typedPlayerStatsEntries.length === 0) return [];
+
+  const allUserIdsInHistory = new Set<number>();
+  const allTeamIdsInHistory = new Set<number>();
+
+  typedPlayerStatsEntries.forEach(entry => {
+    // entry.team_id is guaranteed by !inner join
+    allUserIdsInHistory.add(entry.team_id.user1_id);
+    allUserIdsInHistory.add(entry.team_id.user2_id);
+    allTeamIdsInHistory.add(entry.team_id.id);
+
+    // entry.match_id is guaranteed by !inner join
+    allTeamIdsInHistory.add(entry.match_id.white_team_id);
+    allTeamIdsInHistory.add(entry.match_id.blue_team_id);
+  });
+
+  const uniqueUserIdsArray = [...allUserIdsInHistory];
+  const uniqueTeamIdsArray = [...allTeamIdsInHistory];
+
+  let userMap: Record<number, { id: number; name: string }> = {};
+  if (uniqueUserIdsArray.length > 0) {
+    const { data: users, error: usersError } = await supabase
+      .from('User')
+      .select('id, name')
+      .in('id', uniqueUserIdsArray);
+    if (usersError) console.error('Error fetching users for history:', usersError);
+    else if (users) users.forEach(u => userMap[u.id] = u as { id: number; name: string });
   }
 
-  // Get the teams the player was on
-  const playerTeamIds = playerTeamPlayerEntries.map(tp => tp.team_id);
-  const { data: playerTeams, error: playerTeamsError } = await supabase
-    .from('Team')
-    .select('id, match_id, color')
-    .in('id', playerTeamIds);
-
-  if (playerTeamsError || !playerTeams) {
-    console.error('Error fetching player teams:', playerTeamsError);
-    return [];
-  }
-  const playerTeamMap = playerTeams.reduce((acc, team) => {
-    acc[team.id] = team;
-    return acc;
-  }, {} as Record<number, any>);
-
-  // Get the matches the player participated in
-  const playerMatchIds = playerTeams.map(team => team.match_id);
-  const { data: matches, error: matchesError } = await supabase
-    .from('Match')
-    .select('id, team_white_score, team_blue_score, created_at')
-    .in('id', playerMatchIds);
-
-  if (matchesError || !matches) {
-    console.error('Error fetching matches:', matchesError);
-    return [];
-  }
-  const matchMap = matches.reduce((acc, match) => {
-    acc[match.id] = match;
-    return acc;
-  }, {} as Record<number, any>);
-
-  // Get all Team entries for these matches
-  const allMatchIds = matches.map(m => m.id);
-  const { data: allTeamsInMatches, error: allTeamsError } = await supabase
-    .from('Team')
-    .select('id, match_id, color')
-    .in('match_id', allMatchIds);
-
-  if (allTeamsError || !allTeamsInMatches) {
-    console.error('Error fetching all teams in matches:', allTeamsError);
-    return [];
-  }
-  const allTeamMap = allTeamsInMatches.reduce((acc, team) => {
-    acc[team.id] = team;
-    return acc;
-  }, {} as Record<number, any>);
-
-  // Get all TeamPlayer entries for all teams in these matches
-  const allTeamIdsInMatches = allTeamsInMatches.map(t => t.id);
-  const { data: allTeamPlayersInMatches, error: allTeamPlayersInMatchesError } = await supabase
-    .from('TeamPlayer')
-    .select('id, team_id, user_id')
-    .in('team_id', allTeamIdsInMatches);
-
-  if (allTeamPlayersInMatchesError || !allTeamPlayersInMatches) {
-    console.error('Error fetching all team players in matches:', allTeamPlayersInMatchesError);
-    return [];
+  let teamDetailsMap: Record<number, JoinedTeamDetails> = {};
+   if (uniqueTeamIdsArray.length > 0) {
+    const { data: teams, error: teamsError } = await supabase
+      .from('Team')
+      .select('id, user1_id, user2_id, name')
+      .in('id', uniqueTeamIdsArray);
+    if (teamsError) console.error('Error fetching teams for history:', teamsError);
+    else if (teams) teams.forEach(t => teamDetailsMap[t.id] = t as JoinedTeamDetails);
   }
 
-  // Get all users involved in these matches
-  const allUserIdsInMatches = allTeamPlayersInMatches.map(tp => tp.user_id);
-  // Deduplicate user IDs before fetching
-  const uniqueUserIds = [...new Set(allUserIdsInMatches)];
-  const { data: users, error: usersError } = await supabase
-    .from('User')
-    .select('id, name')
-    .in('id', uniqueUserIds);
+  return typedPlayerStatsEntries.map(pms => {
+    // With !inner joins, pms.match_id and pms.team_id are guaranteed to exist.
+    const matchDetails = pms.match_id;
+    const playerTeamDetails = teamDetailsMap[pms.team_id.id] || pms.team_id; // Fallback to pms.team_id if not in map (should be)
 
-  if (usersError || !users) {
-    console.error('Error fetching users:', usersError);
-    return [];
-  }
-  const userMap = users.reduce((acc, user) => {
-    acc[user.id] = user;
-    return acc;
-  }, {} as Record<number, any>);
+    const playerScore = pms.scored;
+    const opponentScore = pms.conceded;
+    const won = playerScore > opponentScore;
+    const resultString = won ? 'Win' : (playerScore === opponentScore ? 'Draw' : 'Loss');
+    const formattedScoreString = `${playerScore}-${opponentScore}`;
 
-  // Map player's team player entries to match history with detailed information
-  return playerTeamPlayerEntries.map(tp => {
-    const playerSpecificTeam = playerTeamMap[tp.team_id]; // This is the team the current player was on for this specific TeamPlayer entry
-    if (!playerSpecificTeam) {
-        console.warn(`Could not find team with id ${tp.team_id} in playerTeamMap for TeamPlayer entry ${tp.id}`);
-        return null; // Or some default error object
-    }
-    const match = matchMap[playerSpecificTeam.match_id];
-    if (!match) {
-        console.warn(`Could not find match with id ${playerSpecificTeam.match_id} in matchMap for TeamPlayer entry ${tp.id}`);
-        return null;
+    let eloChange = 0;
+    if (pms.new_elo !== pms.old_elo) eloChange = pms.new_elo - pms.old_elo;
+    else if (pms.new_elo_offense !== pms.old_elo_offense) eloChange = pms.new_elo_offense - pms.old_elo_offense;
+
+    let teammateName = '-';
+    if (playerTeamDetails) {
+        const teammateId = playerTeamDetails.user1_id === userId ? playerTeamDetails.user2_id : playerTeamDetails.user1_id;
+        if (teammateId !== userId) {
+             teammateName = userMap[teammateId]?.name || 'Unknown';
+        }
     }
 
-    // Determine teammates
-    const currentPlayerTeamPlayers = allTeamPlayersInMatches.filter(p => p.team_id === playerSpecificTeam.id);
-    const teammatePlayerEntry = currentPlayerTeamPlayers.find(p => p.user_id !== userId);
-    const teammate = teammatePlayerEntry ? userMap[teammatePlayerEntry.user_id] : null;
+    let opponentsString = 'Unknown Opponents';
+    const opponentTeamId = matchDetails.white_team_id === playerTeamDetails.id ? matchDetails.blue_team_id : matchDetails.white_team_id;
 
-    // Determine opponents
-    const opposingTeamPlayers = allTeamPlayersInMatches.filter(p => {
-      const pTeam = allTeamMap[p.team_id];
-      return pTeam && pTeam.match_id === match.id && pTeam.id !== playerSpecificTeam.id;
-    });
-
-    const opponentUsers = opposingTeamPlayers.map(p => userMap[p.user_id]).filter(u => u); // Filter out undefined users
-    const uniqueOpponents = Array.from(new Set(opponentUsers.map(u => u.id)))
-                               .map(id => opponentUsers.find(u => u.id === id));
-
-    // Determine match outcome and score directly from TeamPlayer's scored/conceded fields
-    const playerScoreInMatch = tp.scored;
-    const opponentScoreInMatch = tp.conceded;
-
-    const won = playerScoreInMatch > opponentScoreInMatch;
-    const resultString = won ? 'Win' : (playerScoreInMatch === opponentScoreInMatch ? 'Draw' : 'Loss');
-    const formattedScoreString = `${playerScoreInMatch}-${opponentScoreInMatch}`;
+    if (opponentTeamId) {
+        const opponentTeamDetails = teamDetailsMap[opponentTeamId];
+        if (opponentTeamDetails) {
+            const opp1Name = userMap[opponentTeamDetails.user1_id]?.name || 'Player';
+            const opp2Name = userMap[opponentTeamDetails.user2_id]?.name || 'Player';
+            opponentsString = opponentTeamDetails.user1_id === opponentTeamDetails.user2_id ? opp1Name : `${opp1Name} & ${opp2Name}`;
+        }
+    }
 
     return {
-      id: tp.id,
-      date: match.created_at,
+      id: pms.id,
+      match_db_id: matchDetails.id,
+      date: matchDetails.created_at,
       result: resultString,
       score: formattedScoreString,
-      eloChange: tp.new_elo - tp.old_elo,
-      oldElo: tp.old_elo,
-      newElo: tp.new_elo,
-      scored: tp.scored,
-      conceded: tp.conceded,
-      teammate: teammate ? teammate.name : '-',
-      opponents: uniqueOpponents.length > 0 ? uniqueOpponents.map(o => o ? o.name : 'Unknown').join(' & ') : 'Unknown Opponents'
+      eloChange: eloChange,
+      oldElo: pms.new_elo !== pms.old_elo ? pms.old_elo : pms.old_elo_offense,
+      newElo: pms.new_elo !== pms.old_elo ? pms.new_elo : pms.new_elo_offense,
+      scored_by_team: pms.scored,
+      conceded_by_team: pms.conceded,
+      teammate: teammateName,
+      opponents: opponentsString
     };
-  }).filter(matchHistoryEntry => matchHistoryEntry !== null); // Filter out null entries from map
+  }).filter(Boolean);
 }
 
-// Function to get a player's Elo history
+// Define a more specific type for ELO history entries from PlayerMatchStats
+interface EloHistoryStatEntry {
+    id: number;
+    created_at: string; // from PlayerMatchStats table
+    old_elo: number;
+    new_elo: number;
+    old_elo_offense: number;
+    new_elo_offense: number;
+    match_id: { created_at: string }; // from joined Match table
+}
+
 export async function getPlayerEloHistory(userId: number): Promise<any[]> {
-  const { data: teamPlayers, error: teamPlayersError } = await supabase
-    .from('TeamPlayer')
-    .select('id, team_id, old_elo, new_elo, created_at')
+  const { data: playerStats, error: pmsError } = await supabase
+    .from('PlayerMatchStats')
+    .select('id, created_at, old_elo, new_elo, old_elo_offense, new_elo_offense, match_id!inner(created_at)')
     .eq('user_id', userId)
     .order('created_at', { ascending: true });
 
-  if (teamPlayersError || !teamPlayers) {
-    console.error('Error fetching team players for Elo history:', teamPlayersError);
+  if (pmsError || !playerStats) {
+    console.error('Error fetching player stats for Elo history:', pmsError);
     return [];
   }
 
-  // If no matches, return an array with just the initial Elo
-  if (teamPlayers.length === 0) {
-    const { data: user, error: userError } = await supabase
-      .from('User')
-      .select('elo_offense, elo_defense')
-      .eq('id', userId)
-      .single();
+  const typedEntries = playerStats as unknown as EloHistoryStatEntry[];
 
-    if (userError || !user) {
-      console.error('Error fetching user for Elo history:', userError);
-      return [];
-    }
-
-    const now = new Date().toISOString();
-    return [
-      {
-        x: now,
-        y: user.elo_offense || DEFAULT_ELO,
-        id: 'initial',
-        type: 'offense'
-      },
-      {
-        x: now,
-        y: user.elo_defense || DEFAULT_ELO,
-        id: 'initial',
-        type: 'defense'
-      }
-    ];
-  }
-
-  // Get the user to determine current Elo values
-  const { data: user, error: userError } = await supabase
+  const { data: userCurrentElo, error: userError } = await supabase
     .from('User')
-    .select('elo_offense, elo_defense')
+    .select('elo_offense, elo_defense, created_at')
     .eq('id', userId)
     .single();
 
-  if (userError || !user) {
+  if (userError || !userCurrentElo) {
     console.error('Error fetching user for Elo history:', userError);
     return [];
   }
 
-  // Create two separate series for offense and defense
   const offenseData: any[] = [];
   const defenseData: any[] = [];
 
-  // Add initial point with starting Elo
-  const firstMatch = new Date(teamPlayers[0].created_at);
-  const oneWeekBefore = new Date(firstMatch);
-  oneWeekBefore.setDate(oneWeekBefore.getDate() - 7);
-
-  offenseData.push({
-    x: oneWeekBefore.toISOString(),
-    y: DEFAULT_ELO,  // Default starting Elo
-    id: 'initial',
-    type: 'offense'
-  });
-
-  defenseData.push({
-    x: oneWeekBefore.toISOString(),
-    y: DEFAULT_ELO,  // Default starting Elo
-    id: 'initial',
-    type: 'defense'
-  });
-
-  // Process the team players to map history to data points
-  // We'll use the current user's Elo values to determine if a history point is offense or defense
-  // by comparing the Elo values with the current ones
-  for (const tp of teamPlayers) {
-    // Get the current player data for this match
-    const { data: matchTeamPlayers, error: matchTeamPlayersError } = await supabase
-      .from('TeamPlayer')
-      .select('user_id, team_id, old_elo, new_elo')
-      .eq('id', tp.id);
-
-    if (matchTeamPlayersError || !matchTeamPlayers || matchTeamPlayers.length === 0) {
-      console.error('Error fetching match team players:', matchTeamPlayersError);
-      continue;
-    }
-
-    // For each history point, determine if it's offense or defense based on the new Elo value
-    // Comparison against the current offense/defense values
-    const isCloserToOffense = Math.abs(user.elo_offense - tp.new_elo) <= Math.abs(user.elo_defense - tp.new_elo);
-
-    const dataPoint = {
-      x: tp.created_at,
-      y: tp.new_elo,
-      id: tp.id,
-      type: isCloserToOffense ? 'offense' : 'defense'
-    };
-
-    if (isCloserToOffense) {
-      offenseData.push(dataPoint);
-    } else {
-      defenseData.push(dataPoint);
-    }
+  if (typedEntries.length === 0) {
+    const initialDate = new Date(userCurrentElo.created_at || Date.now()).toISOString();
+    offenseData.push({ x: initialDate, y: userCurrentElo.elo_offense || DEFAULT_ELO, id: 'initial-offense', type: 'offense' });
+    defenseData.push({ x: initialDate, y: userCurrentElo.elo_defense || DEFAULT_ELO, id: 'initial-defense', type: 'defense' });
+    return [...offenseData, ...defenseData].sort((a,b) => new Date(a.x).getTime() - new Date(b.x).getTime());
   }
 
-  // Add current Elo as last point
+  const firstMatchRecord = typedEntries[0];
+  // Use PlayerMatchStats.created_at as it is the match date, fallback to joined match.created_at if necessary
+  const firstMatchDate = new Date(firstMatchRecord.created_at || firstMatchRecord.match_id.created_at);
+  const preFirstMatchDate = new Date(firstMatchDate);
+  preFirstMatchDate.setDate(preFirstMatchDate.getDate() - 7);
+
+  // Use the 'old' ELO from the very first match record as the starting point before that match.
+  let initialDefenseElo = firstMatchRecord.old_elo;
+  let initialOffenseElo = firstMatchRecord.old_elo_offense;
+
+  offenseData.push({ x: preFirstMatchDate.toISOString(), y: initialOffenseElo, id: 'initial-off', type: 'offense' });
+  defenseData.push({ x: preFirstMatchDate.toISOString(), y: initialDefenseElo, id: 'initial-def', type: 'defense' });
+
+  typedEntries.forEach(ps => {
+    // Use PlayerMatchStats.created_at for the X-axis point
+    const matchDate = new Date(ps.created_at || ps.match_id.created_at).toISOString();
+    // For each match, both new_elo (defense actual after match) and new_elo_offense (offense actual after match) are recorded.
+    // These represent the ELO state *after* the match for both roles.
+    defenseData.push({ x: matchDate, y: ps.new_elo, id: `match-${ps.id}-def`, type: 'defense' });
+    offenseData.push({ x: matchDate, y: ps.new_elo_offense, id: `match-${ps.id}-off`, type: 'offense'});
+  });
+
   const now = new Date().toISOString();
+  offenseData.push({ x: now, y: userCurrentElo.elo_offense || DEFAULT_ELO, id: 'current-off', type: 'offense' });
+  defenseData.push({ x: now, y: userCurrentElo.elo_defense || DEFAULT_ELO, id: 'current-def', type: 'defense' });
 
-  offenseData.push({
-    x: now,
-    y: user.elo_offense || DEFAULT_ELO,
-    id: 'current',
-    type: 'offense'
-  });
+  const dedupedOffense = Array.from(new Map(offenseData.map(item => [`${item.x}-${item.type}`, item])).values());
+  const dedupedDefense = Array.from(new Map(defenseData.map(item => [`${item.x}-${item.type}`, item])).values());
 
-  defenseData.push({
-    x: now,
-    y: user.elo_defense || DEFAULT_ELO,
-    id: 'current',
-    type: 'defense'
-  });
-
-  // Combine both series
-  return [...offenseData, ...defenseData];
+  return [...dedupedOffense, ...dedupedDefense].sort((a,b) => new Date(a.x).getTime() - new Date(b.x).getTime());
 }
