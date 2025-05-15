@@ -6,7 +6,6 @@ import { History } from './components/History';
 import { OptimalTeams } from './components/OptimalTeams';
 import { Players } from './components/Players';
 import { AddPlayer } from './components/AddPlayer';
-import { ImportMatches } from './components/ImportMatches';
 import type { MatchData } from "./lib/supabase";
 
 function App() {
@@ -41,16 +40,16 @@ function App() {
         return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
       case 'AddPlayer':
         return <AddPlayer />;
-      case 'ImportMatches':
-        return <ImportMatches />;
+      // case 'ImportMatches':
+      //   return <ImportMatches />;
       default:
         return <EnterScore onSubmit={handleSubmit} />;
     }
   };
 
   return (
-    <Layout 
-      activeNavItem={activeNavItem} 
+    <Layout
+      activeNavItem={activeNavItem}
       onNavItemClick={(item) => {
         if (item !== 'History') {
             clearSelectedPlayerIdForHistory();
