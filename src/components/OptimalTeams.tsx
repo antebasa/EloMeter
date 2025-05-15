@@ -84,8 +84,6 @@ const generateBalancedTeams = (selectedPlayers: PlayerWithSkills[]) => {
 // Calculate player skill metrics based on their stats
 const calculatePlayerSkills = (player: User): PlayerWithSkills => {
   // Use played games to adjust skill weighting
-  const gamesPlayed = player.played || 0;
-
   // Use the actual ELO values directly
   const defenseElo = player.elo_defense || 1400;
   const offenseElo = player.elo_offense || 1400;
