@@ -40,6 +40,7 @@ export interface MatchData {
   team1OffenseGoals?: number; // Optional goals scored by team1 offense player
   team2DefenseGoals?: number; // Optional goals scored by team2 defense player
   team2OffenseGoals?: number; // Optional goals scored by team2 offense player
+  date?: Date; // Optional goals scored by team2 offense player
 }
 
 // Function to get all users
@@ -145,7 +146,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       .insert({
         team_white_score: matchData.team1Score,
         team_blue_score: matchData.team2Score,
-        created_at: new Date()
+        created_at: matchData.date ? new Date(matchData.date) : new Date()
       })
       .select('id')
       .single();
@@ -163,7 +164,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       .insert({
         match_id: matchId,
         color: TeamColor.WHITE,
-        created_at: new Date()
+        created_at: matchData.date ? new Date(matchData.date) : new Date()
       })
       .select('id')
       .single();
@@ -179,7 +180,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       .insert({
         match_id: matchId,
         color: TeamColor.BLUE,
-        created_at: new Date()
+        created_at: matchData.date ? new Date(matchData.date) : new Date()
       })
       .select('id')
       .single();
@@ -199,7 +200,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
         conceded: matchData.team2Score,
         old_elo: team1DefenseDefElo,
         new_elo: newTeam1DefenseDefElo,
-        created_at: new Date()
+        created_at: matchData.date ? new Date(matchData.date) : new Date()
       },
       // White team - Offense
       {
@@ -209,7 +210,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
         conceded: matchData.team2Score,
         old_elo: team1OffenseOffElo,
         new_elo: newTeam1OffenseOffElo,
-        created_at: new Date()
+        created_at: matchData.date ? new Date(matchData.date) : new Date()
       },
       // Blue team - Defense
       {
@@ -219,7 +220,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
         conceded: matchData.team1Score,
         old_elo: team2DefenseDefElo,
         new_elo: newTeam2DefenseDefElo,
-        created_at: new Date()
+        created_at: matchData.date ? new Date(matchData.date) : new Date()
       },
       // Blue team - Offense
       {
@@ -229,7 +230,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
         conceded: matchData.team1Score,
         old_elo: team2OffenseOffElo,
         new_elo: newTeam2OffenseOffElo,
-        created_at: new Date()
+        created_at: matchData.date ? new Date(matchData.date) : new Date()
       }
     ];
 
@@ -413,10 +414,10 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       const pTeam = allTeamMap[p.team_id];
       return pTeam && pTeam.match_id === match.id && pTeam.id !== playerSpecificTeam.id;
     });
-    
+
     const opponentUsers = opposingTeamPlayers.map(p => userMap[p.user_id]).filter(u => u); // Filter out undefined users
     const uniqueOpponents = Array.from(new Set(opponentUsers.map(u => u.id)))
-                               .map(id => opponentUsers.find(u => u.id === id)); 
+                               .map(id => opponentUsers.find(u => u.id === id));
 
     // Determine match outcome and score directly from TeamPlayer's scored/conceded fields
     const playerScoreInMatch = tp.scored;
@@ -434,9 +435,9 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       eloChange: tp.new_elo - tp.old_elo,
       oldElo: tp.old_elo,
       newElo: tp.new_elo,
-      scored: tp.scored, 
-      conceded: tp.conceded, 
-      teammate: teammate ? teammate.name : '-', 
+      scored: tp.scored,
+      conceded: tp.conceded,
+      teammate: teammate ? teammate.name : '-',
       opponents: uniqueOpponents.length > 0 ? uniqueOpponents.map(o => o ? o.name : 'Unknown').join(' & ') : 'Unknown Opponents'
     };
   }).filter(matchHistoryEntry => matchHistoryEntry !== null); // Filter out null entries from map
@@ -470,14 +471,14 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
 
     const now = new Date().toISOString();
     return [
-      { 
-        x: now, 
+      {
+        x: now,
         y: user.elo_offense || DEFAULT_ELO,
         id: 'initial',
         type: 'offense'
       },
-      { 
-        x: now, 
+      {
+        x: now,
         y: user.elo_defense || DEFAULT_ELO,
         id: 'initial',
         type: 'defense'
