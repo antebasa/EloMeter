@@ -15,7 +15,7 @@ export interface User {
   name: string;
   email?: string;
   created_at?: string; // This is timestamp with time zone in DB
-  goals?: number;
+  scored?: number;
   conceded?: number;
   wins?: number;
   losses?: number;
@@ -156,7 +156,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
 
     const { data: usersData, error: getUsersError } = await supabase
       .from('User')
-      .select('id, name, elo_offense, elo_defense, goals, conceded, wins, losses, played') // Added name here
+      .select('id, name, elo_offense, elo_defense, scored, conceded, wins, losses, played')
       .in('id', playerIds);
 
     if (getUsersError || !usersData || usersData.length < playerIds.length) {
@@ -263,10 +263,10 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
     const isDraw = matchData.team1Score === matchData.team2Score;
 
     const userUpdatesPayload = [
-        { id: t1dId, elo_defense: newT1dDefElo, goals_scored: matchData.team1Score, goals_conceded: matchData.team2Score, won: team1Won, isDraw: isDraw },
-        { id: t1oId, elo_offense: newT1oOffElo, goals_scored: matchData.team1Score, goals_conceded: matchData.team2Score, won: team1Won, isDraw: isDraw },
-        { id: t2dId, elo_defense: newT2dDefElo, goals_scored: matchData.team2Score, goals_conceded: matchData.team1Score, won: !team1Won && !isDraw, isDraw: isDraw },
-        { id: t2oId, elo_offense: newT2oOffElo, goals_scored: matchData.team2Score, goals_conceded: matchData.team1Score, won: !team1Won && !isDraw, isDraw: isDraw }
+        { id: t1dId, elo_defense: newT1dDefElo, scored_this_match: matchData.team1Score, conceded_this_match: matchData.team2Score, won: team1Won, isDraw: isDraw },
+        { id: t1oId, elo_offense: newT1oOffElo, scored_this_match: matchData.team1Score, conceded_this_match: matchData.team2Score, won: team1Won, isDraw: isDraw },
+        { id: t2dId, elo_defense: newT2dDefElo, scored_this_match: matchData.team2Score, conceded_this_match: matchData.team1Score, won: !team1Won && !isDraw, isDraw: isDraw },
+        { id: t2oId, elo_offense: newT2oOffElo, scored_this_match: matchData.team2Score, conceded_this_match: matchData.team1Score, won: !team1Won && !isDraw, isDraw: isDraw }
     ];
 
     for (const update of userUpdatesPayload) {
@@ -274,14 +274,18 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       if (!currentUser) continue; // Should not happen if initial fetch was correct
       const userStatUpdate: Partial<User> = {
         played: (currentUser.played || 0) + 1,
-        goals: (currentUser.goals || 0) + update.goals_scored,
-        conceded: (currentUser.conceded || 0) + update.goals_conceded,
+        scored: (currentUser.scored || 0) + update.scored_this_match,
+        conceded: (currentUser.conceded || 0) + update.conceded_this_match,
         wins: (currentUser.wins || 0) + (update.won ? 1 : 0),
         losses: (currentUser.losses || 0) + (!update.won && !update.isDraw ? 1 : 0),
       };
-      if (update.elo_defense !== undefined) userStatUpdate.elo_defense = update.elo_defense;
-      if (update.elo_offense !== undefined) userStatUpdate.elo_offense = update.elo_offense;
-
+      if ('elo_defense' in update && update.elo_defense !== undefined) {
+        userStatUpdate.elo_defense = update.elo_defense;
+      }
+      if ('elo_offense' in update && update.elo_offense !== undefined) {
+        userStatUpdate.elo_offense = update.elo_offense;
+      }
+      
       const { error: userUpdateError } = await supabase.from('User').update(userStatUpdate).eq('id', update.id);
       if (userUpdateError) {
         console.error(`Error updating user ${update.id}:`, userUpdateError);
