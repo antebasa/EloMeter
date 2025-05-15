@@ -7,21 +7,24 @@ import { OptimalTeams } from './components/OptimalTeams';
 import { Players } from './components/Players';
 import { AddPlayer } from './components/AddPlayer';
 import { ImportMatches } from './components/ImportMatches';
-
-interface FormData {
-  player1: string;
-  player2: string;
-  player3: string;
-  player4: string;
-  score: string;
-}
+import type { MatchData } from "./lib/supabase";
 
 function App() {
   const [activeNavItem, setActiveNavItem] = useState<string>('EnterScore');
+  const [selectedPlayerIdForHistory, setSelectedPlayerIdForHistory] = useState<number | null>(null);
 
-  const handleSubmit = (data: FormData) => {
+  const handleSubmit = (data: MatchData) => {
     console.log('Form submitted with data:', data);
-    // Handle form submission here
+    // Handle form submission here, potentially with data typed as MatchData
+  };
+
+  const handleNavigateToHistoryWithPlayer = (playerId: number) => {
+    setSelectedPlayerIdForHistory(playerId);
+    setActiveNavItem('History');
+  };
+
+  const clearSelectedPlayerIdForHistory = () => {
+    setSelectedPlayerIdForHistory(null);
   };
 
   const renderContent = () => {
@@ -31,11 +34,11 @@ function App() {
       case 'MatchOdds':
         return <MatchOdds />;
       case 'History':
-        return <History />;
+        return <History selectedPlayerIdProp={selectedPlayerIdForHistory} onDoneWithSelectedPlayer={clearSelectedPlayerIdForHistory} />;
       case 'OptimalTeams':
         return <OptimalTeams />;
       case 'Players':
-        return <Players />;
+        return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
       case 'AddPlayer':
         return <AddPlayer />;
       case 'ImportMatches':
@@ -48,7 +51,12 @@ function App() {
   return (
     <Layout 
       activeNavItem={activeNavItem} 
-      onNavItemClick={setActiveNavItem}
+      onNavItemClick={(item) => {
+        if (item !== 'History') {
+            clearSelectedPlayerIdForHistory();
+        }
+        setActiveNavItem(item);
+      }}
     >
       {renderContent()}
     </Layout>

@@ -282,7 +282,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
         <Flex justify="center" mb={6} align="center">
           <NumberInput
             min={0}
-            max={99}
+            max={10}
             value={formData.team1Score}
             onChange={(_, value) => handleScoreChange('team1Score', value)}
             width="80px"
@@ -299,7 +299,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
 
           <NumberInput
             min={0}
-            max={99}
+            max={10}
             value={formData.team2Score}
             onChange={(_, value) => handleScoreChange('team2Score', value)}
             width="80px"

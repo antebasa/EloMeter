@@ -40,16 +40,23 @@ const formatDate = (dateString: string) => {
   });
 };
 
-export const History = () => {
+// Define props for History component
+interface HistoryProps {
+  selectedPlayerIdProp?: number | null;
+  onDoneWithSelectedPlayer?: () => void;
+}
+
+export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: HistoryProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null);
   const [matchHistory, setMatchHistory] = useState<any[]>([]);
   const [eloHistory, setEloHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPlayerData, setCurrentPlayerData] = useState<User | null>(null);
   const [showOffenseElo, setShowOffenseElo] = useState<boolean>(true);
   const [showDefenseElo, setShowDefenseElo] = useState<boolean>(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
   
   useEffect(() => {
     // Load the users when the component mounts
@@ -66,7 +73,7 @@ export const History = () => {
         console.error("Error loading users:", err);
         setError("Failed to load users. Please try again later.");
       } finally {
-        setLoading(false);
+        setInitialLoadComplete(true);
       }
     }
 
@@ -109,8 +116,10 @@ export const History = () => {
       }
     }
     
-    loadPlayerData();
-  }, [selectedPlayer]);
+    if (initialLoadComplete) {
+      loadPlayerData();
+    }
+  }, [selectedPlayer, initialLoadComplete]);
 
   // Format the chart data - group by date and separate offense/defense
   const chartData = eloHistory && eloHistory.length > 0 ? eloHistory.reduce((acc: any[], item: any) => {
@@ -168,7 +177,11 @@ export const History = () => {
 
   // Handler for player selection change
   const handlePlayerChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedPlayer(parseInt(event.target.value, 10));
+    const playerId = parseInt(event.target.value, 10);
+    setSelectedPlayer(playerId);
+    if (onDoneWithSelectedPlayer) {
+      onDoneWithSelectedPlayer();
+    }
   };
 
   // Default zeros for any missing stats
@@ -176,7 +189,7 @@ export const History = () => {
     played: currentPlayerData?.played || 0,
     wins: currentPlayerData?.wins || 0,
     losses: currentPlayerData?.losses || 0,
-    goals: currentPlayerData?.goals || 0,
+    scored: currentPlayerData?.scored || 0,
     conceded: currentPlayerData?.conceded || 0,
     elo_offense: currentPlayerData?.elo_offense || 1500,
     elo_defense: currentPlayerData?.elo_defense || 1500
@@ -185,19 +198,24 @@ export const History = () => {
   // Calculate combined ELO (weighted average)
   const combinedElo = Math.round((playerStats.elo_offense * 0.6) + (playerStats.elo_defense * 0.4));
 
+  if (!initialLoadComplete && !selectedPlayerIdProp) {
+    return <Flex justify="center" align="center" height="200px"><Spinner size="xl" /></Flex>;
+  }
+
   return (
     <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
       <Flex direction={{ base: "column", md: "row" }} align={{ base: "flex-start", md: "center" }} mb={6}>
         <Heading as="h2" size="lg" flex="1">Player History</Heading>
         <Box maxWidth="300px" w="100%">
           <Select 
-            value={selectedPlayer || ""}
+            value={selectedPlayer === null ? "" : selectedPlayer.toString()}
             onChange={handlePlayerChange}
             placeholder="Select player"
-            isDisabled={loading || users.length === 0}
+            isDisabled={users.length === 0}
+            size="md"
           >
             {users.map(player => (
-              <option key={player.id} value={player.id}>{player.name}</option>
+              <option key={player.id} value={player.id.toString()}>{player.name}</option>
             ))}
           </Select>
         </Box>
@@ -243,7 +261,7 @@ export const History = () => {
             <Text fontWeight="bold">Goals</Text>
             <HStack spacing={4} justify="center">
               <Box>
-                <Text fontWeight="bold" color="green.500">{playerStats.goals}</Text>
+                <Text fontWeight="bold" color="green.500">{playerStats.scored}</Text>
                 <Text fontSize="sm">Scored</Text>
               </Box>
               <Box>
@@ -253,13 +271,6 @@ export const History = () => {
             </HStack>
           </Box>
         </Flex>
-      )}
-      
-      {error && (
-        <Alert status="error" mb={4} borderRadius="md">
-          <AlertIcon />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
       )}
       
       {loading ? (

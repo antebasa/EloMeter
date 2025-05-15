@@ -71,7 +71,12 @@ interface PlayerWithStats extends User {
   recentFormDetailed: MatchHistoryDisplayEntry[];
 }
 
-export const Players = () => {
+// Define props for Players component
+interface PlayersProps {
+  onPlayerClick: (playerId: number) => void;
+}
+
+export const Players = ({ onPlayerClick }: PlayersProps) => {
   // Moved useColorModeValue calls to the top
   const tableBg = useColorModeValue("white", "gray.750");
   const headerBg = useColorModeValue("gray.50", "gray.800");
@@ -320,7 +325,7 @@ export const Players = () => {
   }
   
   return (
-    <Box p={{ base: 2, md: 5 }} color={textColor}>
+    <Box p={{ base: 2, md: 5 }}>
       <Heading as="h1" size="xl" mb={6} textAlign="center" color={headingColor}>Player Rankings</Heading>
       
       <InputGroup mb={6} size="lg">
@@ -359,7 +364,13 @@ export const Players = () => {
                 </Thead>
                 <Tbody>
                   {filteredPlayers.map(player => (
-                    <Tr key={player.id} _hover={{ bg: rowHoverBg }} transition="background-color 0.2s ease-in-out" cursor="pointer" >
+                    <Tr 
+                      key={player.id} 
+                      _hover={{ bg: rowHoverBg }} 
+                      transition="background-color 0.2s ease-in-out" 
+                      cursor="pointer" 
+                      onClick={() => onPlayerClick(player.id)}
+                    >
                       <Td>
                         <Flex align="center">
                           <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
@@ -393,7 +404,13 @@ export const Players = () => {
                 </Thead>
                 <Tbody>
                   {filteredPlayers.map(player => (
-                    <Tr key={player.id} _hover={{ bg: rowHoverBg }} transition="background-color 0.2s ease-in-out" cursor="pointer" >
+                    <Tr 
+                      key={player.id} 
+                      _hover={{ bg: rowHoverBg }} 
+                      transition="background-color 0.2s ease-in-out" 
+                      cursor="pointer" 
+                      onClick={() => onPlayerClick(player.id)}
+                    >
                       <Td>
                         <Flex align="center">
                           <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
