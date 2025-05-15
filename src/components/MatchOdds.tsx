@@ -113,11 +113,19 @@ export const MatchOdds = () => {
       let team1Score, team2Score;
 
       if (team1Percentage > team2Percentage) {
-        team1Score = Math.min(10, Math.round(totalGames * (0.5 + spread/2)));
-        team2Score = totalGames - team1Score;
+        // Team 1 is predicted to win, so they get 10 goals
+        team1Score = 10;
+        // Calculate opponent score based on the probability spread
+        team2Score = Math.max(0, Math.min(9, Math.round(10 * (1 - spread))));
+      } else if (team2Percentage > team1Percentage) {
+        // Team 2 is predicted to win, so they get 10 goals
+        team2Score = 10;
+        // Calculate opponent score based on the probability spread
+        team1Score = Math.max(0, Math.min(9, Math.round(10 * (1 - spread))));
       } else {
-        team2Score = Math.min(10, Math.round(totalGames * (0.5 + spread/2)));
-        team1Score = totalGames - team2Score;
+        // Equal probability means a very close match
+        team1Score = 10;
+        team2Score = 9;
       }
 
       setMatchPrediction({

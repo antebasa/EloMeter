@@ -400,18 +400,28 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
     const opponentScore = isTeamBlue ? match.team_white_score : match.team_blue_score;
     const won = teamScore > opponentScore;
 
+    // Format the score to ensure the winning team always has 10 goals
+    let formattedScore;
+    if (won) {
+      formattedScore = `10-${opponentScore}`;
+    } else if (teamScore === opponentScore) {
+      formattedScore = `${teamScore}-${opponentScore}`; // Draw
+    } else {
+      formattedScore = `${teamScore}-10`;
+    }
+
     return {
       id: tp.id,
       date: match.created_at,
       result: won ? 'Win' : teamScore === opponentScore ? 'Draw' : 'Loss',
-      score: `${teamScore}-${opponentScore}`,
+      score: formattedScore,
       eloChange: tp.new_elo - tp.old_elo,
       oldElo: tp.old_elo,
       newElo: tp.new_elo,
       scored: tp.scored,
       conceded: tp.conceded,
       teammate: teammate ? teammate.name : 'Unknown',
-      opponents: opponents.map(o => o ? o.name : 'Unknown').join(' & ')
+      opponents: opponents.length > 0 ? opponents.map(o => o ? o.name : 'Unknown').join(' & ') : 'Unknown Opponents'
     };
   });
 }
