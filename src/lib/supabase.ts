@@ -31,6 +31,10 @@ export interface MatchData {
   team2Offense: string; // user_id
   team1Score: number;
   team2Score: number;
+  team1DefenseGoals?: number; // Optional goals scored by team1 defense player
+  team1OffenseGoals?: number; // Optional goals scored by team1 offense player
+  team2DefenseGoals?: number; // Optional goals scored by team2 defense player
+  team2OffenseGoals?: number; // Optional goals scored by team2 offense player
 }
 
 // Function to insert 10 sample users if they don't exist
@@ -92,7 +96,7 @@ export function calculateEloChange(
   // For close games (1-2 point difference), k-factor stays close to base
   // For blowouts (7+ point difference), k-factor increases significantly
   const dynamicKFactor = Math.min(baseKFactor * 2, baseKFactor + (scoreGap * 2));
-  
+
   // Calculate ELO change
   const eloChange = Math.round(dynamicKFactor * (actualScore1 - expectedScore1));
 
@@ -134,7 +138,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
 
     // Determine the winner
     const team1Won = matchData.team1Score > matchData.team2Score;
-    
+
     // Calculate score gap for k-factor adjustment
     const scoreGap = Math.abs(matchData.team1Score - matchData.team2Score);
 
@@ -157,34 +161,47 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
     // Calculate new team ELOs based on result and score gap
     const { newPlayer1Elo: newTeam1Elo, newPlayer2Elo: newTeam2Elo } =
       calculateEloChange(team1Elo, team2Elo, team1Won, scoreGap);
-    
+
     // Calculate team ELO changes
     const team1EloChange = newTeam1Elo - team1Elo;
     const team2EloChange = newTeam2Elo - team2Elo;
-    
+
     // Calculate the total goals for each team's offense player
-    const team1OffenseScoredGoals = Math.ceil(matchData.team1Score / 2); // Approximation
-    const team2OffenseScoredGoals = Math.ceil(matchData.team2Score / 2); // Approximation
-    
+    const team1OffenseScoredGoals = matchData.team1OffenseGoals !== undefined
+      ? matchData.team1OffenseGoals
+      : Math.ceil(matchData.team1Score / 2); // Use provided goals or default approximation
+
+    const team1DefenseScoredGoals = matchData.team1DefenseGoals !== undefined
+      ? matchData.team1DefenseGoals
+      : Math.floor(matchData.team1Score / 2); // Use provided goals or default approximation
+
+    const team2OffenseScoredGoals = matchData.team2OffenseGoals !== undefined
+      ? matchData.team2OffenseGoals
+      : Math.ceil(matchData.team2Score / 2); // Use provided goals or default approximation
+
+    const team2DefenseScoredGoals = matchData.team2DefenseGoals !== undefined
+      ? matchData.team2DefenseGoals
+      : Math.floor(matchData.team2Score / 2); // Use provided goals or default approximation
+
     // Calculate performance factors for offense and defense based on goals
     // Offense: Higher factor for more goals scored
     const team1OffensePerformance = Math.max(0.5, Math.min(1.5, (team1OffenseScoredGoals / 5) + 0.5));
     const team2OffensePerformance = Math.max(0.5, Math.min(1.5, (team2OffenseScoredGoals / 5) + 0.5));
-    
+
     // Defense: Higher factor for fewer goals conceded
     // Lower is better for defense, so we invert the ratio
     const team1DefensePerformance = Math.max(0.5, Math.min(1.5, (10 - matchData.team2Score) / 5));
     const team2DefensePerformance = Math.max(0.5, Math.min(1.5, (10 - matchData.team1Score) / 5));
-    
+
     // Apply performance factors to individual Elo changes
     // For team 1 - winners get positive ELO change, losers get negative
     const team1DefenderEloChange = team1Won ? Math.abs(team1EloChange) : -Math.abs(team1EloChange);
     const team1OffenderEloChange = team1Won ? Math.abs(team1EloChange) : -Math.abs(team1EloChange);
-    
+
     // For team 2 - winners get positive ELO change, losers get negative
     const team2DefenderEloChange = team1Won ? -Math.abs(team2EloChange) : Math.abs(team2EloChange);
     const team2OffenderEloChange = team1Won ? -Math.abs(team2EloChange) : Math.abs(team2EloChange);
-    
+
     // Apply performance factors to the individual ELO changes
     const newTeam1DefenseDefElo = Math.round(team1DefenseDefElo + (team1DefenderEloChange * team1DefensePerformance));
     const newTeam1OffenseOffElo = Math.round(team1OffenseOffElo + (team1OffenderEloChange * team1OffensePerformance));
@@ -214,7 +231,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       .from('Team')
       .insert({
         match_id: matchId,
-        color: TeamColor.WHITE,
+        color: TeamColor.BLUE,
         created_at: new Date()
       })
       .select('id')
@@ -230,7 +247,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       .from('Team')
       .insert({
         match_id: matchId,
-        color: TeamColor.BLUE,
+        color: TeamColor.WHITE,
         created_at: new Date()
       })
       .select('id')
@@ -247,7 +264,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       {
         team_id: team1Data.id,
         user_id: team1DefenseId,
-        scored: Math.floor(matchData.team1Score / 2), // Split goals evenly, this is an approximation
+        scored: team1DefenseScoredGoals, // Use calculated goals
         conceded: matchData.team2Score,
         old_elo: team1DefenseDefElo,
         new_elo: newTeam1DefenseDefElo,
@@ -257,7 +274,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       {
         team_id: team1Data.id,
         user_id: team1OffenseId,
-        scored: Math.ceil(matchData.team1Score / 2), // Split goals evenly, give extra to offense
+        scored: team1OffenseScoredGoals, // Use calculated goals
         conceded: matchData.team2Score,
         old_elo: team1OffenseOffElo,
         new_elo: newTeam1OffenseOffElo,
@@ -267,7 +284,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       {
         team_id: team2Data.id,
         user_id: team2DefenseId,
-        scored: Math.floor(matchData.team2Score / 2), // Split goals evenly
+        scored: team2DefenseScoredGoals, // Use calculated goals
         conceded: matchData.team1Score,
         old_elo: team2DefenseDefElo,
         new_elo: newTeam2DefenseDefElo,
@@ -277,7 +294,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       {
         team_id: team2Data.id,
         user_id: team2OffenseId,
-        scored: Math.ceil(matchData.team2Score / 2), // Split goals evenly, give extra to offense
+        scored: team2OffenseScoredGoals, // Use calculated goals
         conceded: matchData.team1Score,
         old_elo: team2OffenseOffElo,
         new_elo: newTeam2OffenseOffElo,
@@ -297,7 +314,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
     // 5. Update User stats
     const updateUser1Defense = {
       elo_defense: newTeam1DefenseDefElo,
-      goals: (userMap[team1DefenseId]?.goals || 0) + Math.floor(matchData.team1Score / 2),
+      goals: (userMap[team1DefenseId]?.goals || 0) + team1DefenseScoredGoals,
       conceded: (userMap[team1DefenseId]?.conceded || 0) + matchData.team2Score,
       wins: (userMap[team1DefenseId]?.wins || 0) + (team1Won ? 1 : 0),
       losses: (userMap[team1DefenseId]?.losses || 0) + (team1Won ? 0 : 1),
@@ -306,7 +323,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
 
     const updateUser1Offense = {
       elo_offense: newTeam1OffenseOffElo,
-      goals: (userMap[team1OffenseId]?.goals || 0) + Math.ceil(matchData.team1Score / 2),
+      goals: (userMap[team1OffenseId]?.goals || 0) + team1OffenseScoredGoals,
       conceded: (userMap[team1OffenseId]?.conceded || 0) + matchData.team2Score,
       wins: (userMap[team1OffenseId]?.wins || 0) + (team1Won ? 1 : 0),
       losses: (userMap[team1OffenseId]?.losses || 0) + (team1Won ? 0 : 1),
@@ -315,7 +332,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
 
     const updateUser2Defense = {
       elo_defense: newTeam2DefenseDefElo,
-      goals: (userMap[team2DefenseId]?.goals || 0) + Math.floor(matchData.team2Score / 2),
+      goals: (userMap[team2DefenseId]?.goals || 0) + team2DefenseScoredGoals,
       conceded: (userMap[team2DefenseId]?.conceded || 0) + matchData.team1Score,
       wins: (userMap[team2DefenseId]?.wins || 0) + (team1Won ? 0 : 1),
       losses: (userMap[team2DefenseId]?.losses || 0) + (team1Won ? 1 : 0),
@@ -324,7 +341,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
 
     const updateUser2Offense = {
       elo_offense: newTeam2OffenseOffElo,
-      goals: (userMap[team2OffenseId]?.goals || 0) + Math.ceil(matchData.team2Score / 2),
+      goals: (userMap[team2OffenseId]?.goals || 0) + team2OffenseScoredGoals,
       conceded: (userMap[team2OffenseId]?.conceded || 0) + matchData.team1Score,
       wins: (userMap[team2OffenseId]?.wins || 0) + (team1Won ? 0 : 1),
       losses: (userMap[team2OffenseId]?.losses || 0) + (team1Won ? 1 : 0),
@@ -479,7 +496,7 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
 
     // Format the date
     const date = new Date(match.created_at);
-    const formattedDate = date.toLocaleDateString('en-US', { 
+    const formattedDate = date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric'
     });
@@ -502,7 +519,7 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
 // Function to get a player's ELO rating history
 export async function getPlayerEloHistory(userId: number): Promise<any[]> {
   console.log('Fetching ELO history for user ID:', userId);
-  
+
   // Get the current offense and defense ELO from the user table
   const { data: user, error: userError } = await supabase
     .from('User')
@@ -535,22 +552,22 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
   const offenseHistory = [];
   const defenseHistory = [];
 
-  // Add starting ELO as first entry 
+  // Add starting ELO as first entry
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 3); // 3 months ago
-  
+
   const startDateFormatted = startDate.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric'
   });
-  
+
   offenseHistory.push({
     date: startDateFormatted,
     fullDate: startDate.toISOString(),
     rating: 1500, // Starting ELO
     type: 'offense'
   });
-  
+
   defenseHistory.push({
     date: startDateFormatted,
     fullDate: startDate.toISOString(),
@@ -587,35 +604,35 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
     month: 'short',
     day: 'numeric'
   });
-  
+
   const midDate2 = new Date();
   midDate2.setMonth(midDate2.getMonth() - 1);
   const midDate2Formatted = midDate2.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric'
   });
-  
+
   offenseHistory.push({
     date: midDate1Formatted,
     fullDate: midDate1.toISOString(),
     rating: 1525, // Example value
     type: 'offense'
   });
-  
+
   offenseHistory.push({
     date: midDate2Formatted,
     fullDate: midDate2.toISOString(),
     rating: 1550, // Example value
     type: 'offense'
   });
-  
+
   defenseHistory.push({
     date: midDate1Formatted,
     fullDate: midDate1.toISOString(),
     rating: 1510, // Example value
     type: 'defense'
   });
-  
+
   defenseHistory.push({
     date: midDate2Formatted,
     fullDate: midDate2.toISOString(),
@@ -624,11 +641,11 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
   });
 
   // Combine both histories and sort by date
-  const result = [...offenseHistory, ...defenseHistory].sort((a, b) => 
+  const result = [...offenseHistory, ...defenseHistory].sort((a, b) =>
     new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()
   );
-  
+
   console.log('Final ELO history array:', result);
-  
+
   return result;
 }
