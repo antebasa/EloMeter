@@ -11,7 +11,6 @@ import {
   StatLabel, 
   StatNumber, 
   StatHelpText,
-  Progress,
   Table,
   Thead,
   Tbody,
@@ -24,10 +23,17 @@ import {
   VStack,
   Alert,
   AlertIcon,
-  Spinner
+  Spinner,
+  Card,
+  CardHeader,
+  CardBody,
+  Tag
 } from "@chakra-ui/react";
-import { getUsers } from "../lib/supabase";
+import { getUsers, getMatchHistoryBetweenTeams } from "../lib/supabase";
 import type { User } from "../lib/supabase";
+
+const DEFAULT_DISPLAY_ELO = 1400; // For display if ELO is null
+const WHITE_COLOR_ELO_ADVANTAGE = 25; // Hypothetical ELO advantage for White team
 
 // Calculate the win probability based on team ratings (ELO)
 const calculateWinProbability = (team1Rating: number, team2Rating: number): number => {
@@ -35,15 +41,44 @@ const calculateWinProbability = (team1Rating: number, team2Rating: number): numb
 };
 
 // Calculate combined team strength using position-specific ELO
-const calculateTeamStrength = (
-  defenseElo: number,
-  offenseElo: number
-  // offenseWeight: number = 0.6 // No longer used
-): number => {
-  // const defenseWeight = 1 - offenseWeight; // No longer used
-  // return (offenseElo * offenseWeight) + (defenseElo * defenseWeight); // Old weighted average
-  return (defenseElo + offenseElo) / 2; // Python script uses simple average
+const calculateTeamStrength = (defenseElo: number, offenseElo: number): number => {
+  return (defenseElo + offenseElo) / 2;
 };
+
+// Helper to predict a 10-point score based on win probability
+const predictScore = (winProbabilityTeam1: number) => {
+  let team1Score: number;
+  let team2Score: number;
+
+  if (Math.abs(winProbabilityTeam1 - 0.5) < 0.01) { // Corresponds to 49-51% win prob
+    team1Score = 10;
+    team2Score = 9;
+  } else if (winProbabilityTeam1 > 0.5) {
+    team1Score = 10;
+    const loserScore = Math.round(10 * (1 - winProbabilityTeam1) / winProbabilityTeam1);
+    team2Score = Math.max(0, Math.min(9, loserScore));
+  } else {
+    team2Score = 10;
+    const loserScore = Math.round(10 * winProbabilityTeam1 / (1 - winProbabilityTeam1));
+    team1Score = Math.max(0, Math.min(9, loserScore));
+  }
+  return { team1: team1Score, team2: team2Score };
+};
+
+interface PlayerDetails {
+  id: string;
+  name: string;
+  elo_offense: number;
+  elo_defense: number;
+}
+
+interface TeamPredictionScenario {
+  team1Probability: number;
+  team2Probability: number;
+  team1EffectiveRating: number;
+  team2EffectiveRating: number;
+  predictedScore: { team1: number; team2: number };
+}
 
 export const MatchOdds = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -55,124 +90,201 @@ export const MatchOdds = () => {
     team2Defense: '',
     team2Offense: ''
   });
-  const [matchPrediction, setMatchPrediction] = useState({
-    team1Probability: 50,
-    team2Probability: 50,
-    team1Rating: 1500,
-    team2Rating: 1500,
-    predictedScore: { team1: 5, team2: 5 }
-  });
+
+  const [baseTeam1Rating, setBaseTeam1Rating] = useState<number | null>(null);
+  const [baseTeam2Rating, setBaseTeam2Rating] = useState<number | null>(null);
+  const [eloDifference, setEloDifference] = useState<number | null>(null);
+  
+  const [scenarioTeam1White, setScenarioTeam1White] = useState<TeamPredictionScenario | null>(null);
+  const [scenarioTeam2White, setScenarioTeam2White] = useState<TeamPredictionScenario | null>(null);
+
+  const [recentMatches, setRecentMatches] = useState<any[]>([]);
+  const [loadingRecentMatches, setLoadingRecentMatches] = useState(false);
 
   useEffect(() => {
     async function loadUsers() {
       try {
         const fetchedUsers = await getUsers();
         setUsers(fetchedUsers);
-      } catch (error) {
-        console.error("Error loading users:", error);
+      } catch (err) {
+        console.error("Error loading users:", err);
         setError("Could not load users from database");
       } finally {
         setLoading(false);
       }
     }
-
     loadUsers();
   }, []);
 
-  // Calculate match prediction when players are selected
   useEffect(() => {
-    if (selectedPlayers.team1Defense &&
-        selectedPlayers.team1Offense &&
-        selectedPlayers.team2Defense &&
-        selectedPlayers.team2Offense) {
+    const allPlayersSelected = selectedPlayers.team1Defense &&
+                               selectedPlayers.team1Offense &&
+                               selectedPlayers.team2Defense &&
+                               selectedPlayers.team2Offense;
 
-      // Get player objects
-      const team1DefensePlayer = users.find(u => u.id.toString() === selectedPlayers.team1Defense);
-      const team1OffensePlayer = users.find(u => u.id.toString() === selectedPlayers.team1Offense);
-      const team2DefensePlayer = users.find(u => u.id.toString() === selectedPlayers.team2Defense);
-      const team2OffensePlayer = users.find(u => u.id.toString() === selectedPlayers.team2Offense);
+    if (allPlayersSelected) {
+      const t1d = users.find(u => u.id.toString() === selectedPlayers.team1Defense);
+      const t1o = users.find(u => u.id.toString() === selectedPlayers.team1Offense);
+      const t2d = users.find(u => u.id.toString() === selectedPlayers.team2Defense);
+      const t2o = users.find(u => u.id.toString() === selectedPlayers.team2Offense);
 
-      // Get ELO ratings, defaulting to 1400 (like python script) if not available
-      const team1DefenseElo = team1DefensePlayer?.elo_defense || 1400;
-      const team1OffenseElo = team1OffensePlayer?.elo_offense || 1400;
-      const team2DefenseElo = team2DefensePlayer?.elo_defense || 1400;
-      const team2OffenseElo = team2OffensePlayer?.elo_offense || 1400;
+      if (!t1d || !t1o || !t2d || !t2o) return;
 
-      // Calculate team ratings
-      const team1Rating = calculateTeamStrength(team1DefenseElo, team1OffenseElo);
-      const team2Rating = calculateTeamStrength(team2DefenseElo, team2OffenseElo);
+      const t1DefElo = t1d.elo_defense || DEFAULT_DISPLAY_ELO;
+      const t1OffElo = t1o.elo_offense || DEFAULT_DISPLAY_ELO;
+      const t2DefElo = t2d.elo_defense || DEFAULT_DISPLAY_ELO;
+      const t2OffElo = t2o.elo_offense || DEFAULT_DISPLAY_ELO;
 
-      // Calculate win probability
-      const team1WinProbabilityDecimal = calculateWinProbability(team1Rating, team2Rating); // This is 0-1
-      const team1Percentage = Math.round(team1WinProbabilityDecimal * 100);
-      const team2Percentage = 100 - team1Percentage;
+      const team1Base = calculateTeamStrength(t1DefElo, t1OffElo);
+      const team2Base = calculateTeamStrength(t2DefElo, t2OffElo);
+      
+      setBaseTeam1Rating(Math.round(team1Base));
+      setBaseTeam2Rating(Math.round(team2Base));
+      setEloDifference(Math.round(team1Base - team2Base));
 
-      // Predict score based on Python script's logic
-      let team1Score: number;
-      let team2Score: number;
-      let closeMatchComment = "";
-
-      const team1ExpectedDecimal = team1WinProbabilityDecimal; // Probability for team 1 (0-1)
-      const team2ExpectedDecimal = 1 - team1WinProbabilityDecimal; // Probability for team 2 (0-1)
-
-      if (Math.abs(team1ExpectedDecimal - 0.5) < 0.01) { // Corresponds to 49-51% win prob
-        team1Score = 10;
-        team2Score = 9;
-        closeMatchComment = " (Close Match)";
-      } else if (team1ExpectedDecimal > team2ExpectedDecimal) {
-        team1Score = 10;
-        const loserScore = Math.round(10 * team2ExpectedDecimal / team1ExpectedDecimal);
-        team2Score = Math.max(0, Math.min(9, loserScore)); // Ensure score is between 0-9 for loser
-      } else {
-        team2Score = 10;
-        const loserScore = Math.round(10 * team1ExpectedDecimal / team2ExpectedDecimal);
-        team1Score = Math.max(0, Math.min(9, loserScore)); // Ensure score is between 0-9 for loser
-      }
-
-      setMatchPrediction({
-        team1Probability: team1Percentage,
-        team2Probability: team2Percentage,
-        team1Rating: Math.round(team1Rating),
-        team2Rating: Math.round(team2Rating),
-        predictedScore: { team1: team1Score, team2: team2Score },
-        // We might want to display closeMatchComment somewhere in the UI if needed
+      // Scenario 1: Team 1 is White
+      const t1EffEloS1 = team1Base + WHITE_COLOR_ELO_ADVANTAGE;
+      const t2EffEloS1 = team2Base;
+      const t1ProbS1 = calculateWinProbability(t1EffEloS1, t2EffEloS1);
+      setScenarioTeam1White({
+        team1Probability: Math.round(t1ProbS1 * 100),
+        team2Probability: Math.round((1 - t1ProbS1) * 100),
+        team1EffectiveRating: Math.round(t1EffEloS1),
+        team2EffectiveRating: Math.round(t2EffEloS1),
+        predictedScore: predictScore(t1ProbS1)
       });
+
+      // Scenario 2: Team 2 is White (Team 1 is Blue)
+      const t1EffEloS2 = team1Base;
+      const t2EffEloS2 = team2Base + WHITE_COLOR_ELO_ADVANTAGE;
+      const t1ProbS2 = calculateWinProbability(t1EffEloS2, t2EffEloS2);
+      setScenarioTeam2White({
+        team1Probability: Math.round(t1ProbS2 * 100),
+        team2Probability: Math.round((1 - t1ProbS2) * 100),
+        team1EffectiveRating: Math.round(t1EffEloS2),
+        team2EffectiveRating: Math.round(t2EffEloS2),
+        predictedScore: predictScore(t1ProbS2)
+      });
+
+      // Fetch recent matches
+      const fetchRecentMatches = async () => {
+        setLoadingRecentMatches(true);
+        try {
+          const history = await getMatchHistoryBetweenTeams(
+            t1d.id, t1o.id, // Assuming t1d and t1o form team 1
+            t2d.id, t2o.id  // Assuming t2d and t2o form team 2
+          );
+          setRecentMatches(history);
+        } catch (err) {
+          console.error("Error fetching recent matches:", err);
+          // Optionally set an error state for recent matches
+        } finally {
+          setLoadingRecentMatches(false);
+        }
+      };
+      fetchRecentMatches();
+
+    } else {
+      // Reset if not all players selected
+      setBaseTeam1Rating(null);
+      setBaseTeam2Rating(null);
+      setEloDifference(null);
+      setScenarioTeam1White(null);
+      setScenarioTeam2White(null);
+      setRecentMatches([]);
     }
   }, [selectedPlayers, users]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setSelectedPlayers(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setSelectedPlayers(prev => ({ ...prev, [name]: value }));
   };
 
-  const getPlayerName = (id: string): string => {
-    if (!id) return "Select player";
-    const player = users.find(user => user.id.toString() === id);
-    return player ? player.name : "Unknown player";
-  };
-
-  const getPlayerStats = (id: string) => {
+  const getPlayerDetails = (id: string): PlayerDetails | null => {
     if (!id) return null;
     const player = users.find(user => user.id.toString() === id);
-    if (!player) return null;
-
-    return {
+    return player ? {
+      id: player.id.toString(),
       name: player.name,
-      offenseElo: player.elo_offense || 1500,
-      defenseElo: player.elo_defense || 1500,
-      wins: player.wins || 0,
-      losses: player.losses || 0,
-      played: player.played || 0,
-      winRate: player.played ? Math.round((player.wins || 0) / player.played * 100) : 0
-    };
+      elo_offense: player.elo_offense || DEFAULT_DISPLAY_ELO,
+      elo_defense: player.elo_defense || DEFAULT_DISPLAY_ELO
+    } : null;
+  };
+  
+  const renderPlayerSelect = (team: string, role: string) => {
+    const value = selectedPlayers[`${team}${role}` as keyof typeof selectedPlayers];
+    return (
+      <FormControl mb={3}>
+        <FormLabel>{role} Player</FormLabel>
+        <Select
+          name={`${team}${role}`}
+          value={value}
+          onChange={handleChange}
+          placeholder="Select player"
+          isDisabled={loading}
+        >
+          {users.map(user => (
+            <option key={`${team}${role}-${user.id}`} value={user.id.toString()}>
+              {user.name} (D:{user.elo_defense || DEFAULT_DISPLAY_ELO}, O:{user.elo_offense || DEFAULT_DISPLAY_ELO})
+            </option>
+          ))}
+        </Select>
+      </FormControl>
+    );
   };
 
+  const renderPlayerCard = (playerId: string | null, role: string) => {
+    if (!playerId) return <Text>No {role.toLowerCase()} player selected.</Text>;
+    const player = getPlayerDetails(playerId);
+    if (!player) return <Text>Player not found.</Text>;
+    return (
+      <Box borderWidth="1px" borderRadius="md" p={3} mb={2}>
+        <Text fontWeight="bold">{player.name} ({role})</Text>
+        <Text fontSize="sm">Defense ELO: {player.elo_defense}</Text>
+        <Text fontSize="sm">Offense ELO: {player.elo_offense}</Text>
+      </Box>
+    );
+  };
+
+  const renderPredictionScenario = (scenario: TeamPredictionScenario | null, team1Name: string, team2Name: string, scenarioTitle: string) => {
+    if (!scenario) return null;
+    return (
+      <Box mb={6} p={4} borderWidth="1px" borderRadius="lg" shadow="sm">
+        <Heading size="md" mb={3}>{scenarioTitle}</Heading>
+        <Flex justify="space-around" mb={3}>
+          <Stat textAlign="center">
+            <StatLabel>{team1Name}</StatLabel>
+            <StatNumber color="blue.500">{scenario.team1Probability}%</StatNumber>
+            <StatHelpText>Effective ELO: {scenario.team1EffectiveRating}</StatHelpText>
+          </Stat>
+          <Stat textAlign="center">
+            <StatLabel>{team2Name}</StatLabel>
+            <StatNumber color="orange.500">{scenario.team2Probability}%</StatNumber>
+            <StatHelpText>Effective ELO: {scenario.team2EffectiveRating}</StatHelpText>
+          </Stat>
+        </Flex>
+        <Text textAlign="center" fontWeight="bold" fontSize="lg">
+          Predicted Score: {scenario.predictedScore.team1} - {scenario.predictedScore.team2}
+        </Text>
+      </Box>
+    );
+  };
+
+  const team1Ready = selectedPlayers.team1Defense && selectedPlayers.team1Offense;
+  const team2Ready = selectedPlayers.team2Defense && selectedPlayers.team2Offense;
+  const allPlayersSelected = team1Ready && team2Ready;
+
+  const t1dName = getPlayerDetails(selectedPlayers.team1Defense)?.name || "TBD";
+  const t1oName = getPlayerDetails(selectedPlayers.team1Offense)?.name || "TBD";
+  const t2dName = getPlayerDetails(selectedPlayers.team2Defense)?.name || "TBD";
+  const t2oName = getPlayerDetails(selectedPlayers.team2Offense)?.name || "TBD";
+  
+  const team1DisplayName = team1Ready ? `${t1dName} & ${t1oName}` : "Team 1";
+  const team2DisplayName = team2Ready ? `${t2dName} & ${t2oName}` : "Team 2";
+
   return (
-    <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
-      <Heading as="h2" size="lg" mb={6}>Match Odds Prediction</Heading>
+    <Box maxWidth="1000px" mx="auto" p={6} borderRadius="lg" boxShadow="xl" bg="gray.50">
+      <Heading as="h2" size="xl" mb={6} textAlign="center" color="teal.600">Match Outcome Predictor</Heading>
       
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
@@ -181,198 +293,92 @@ export const MatchOdds = () => {
         </Alert>
       )}
       
-      {loading ? (
-        <Flex justify="center" py={8}>
-          <Spinner size="xl" />
-        </Flex>
-      ) : (
+      {loading && (
+        <Flex justify="center" py={10}><Spinner size="xl" color="teal.500" /></Flex>
+      )}
+
+      {!loading && (
         <>
-          <Box mb={8}>
-            <Heading as="h3" size="md" mb={4}>Team Selection</Heading>
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-              <Box bg="blue.50" p={4} borderRadius="md">
-                <Heading as="h4" size="sm" mb={4} textAlign="center">Team 1</Heading>
-                <FormControl mb={3}>
-                  <FormLabel>Defense Player</FormLabel>
-                  <Select
-                    name="team1Defense"
-                    value={selectedPlayers.team1Defense}
-                    onChange={handleChange}
-                    placeholder="Select player"
-                    isDisabled={loading}
-                  >
-                    {users.map(user => (
-                      <option key={`team1Defense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (DEF: {user.elo_defense || 1500})
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Offense Player</FormLabel>
-                  <Select
-                    name="team1Offense"
-                    value={selectedPlayers.team1Offense}
-                    onChange={handleChange}
-                    placeholder="Select player"
-                    isDisabled={loading}
-                  >
-                    {users.map(user => (
-                      <option key={`team1Offense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (OFF: {user.elo_offense || 1500})
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-              
-              <Box bg="rgba(245, 240, 225, 0.5)" p={4} borderRadius="md" borderColor="gray.200" borderWidth="1px">
-                <Heading as="h4" size="sm" mb={4} textAlign="center">Team 2</Heading>
-                <FormControl mb={3}>
-                  <FormLabel>Defense Player</FormLabel>
-                  <Select
-                    name="team2Defense"
-                    value={selectedPlayers.team2Defense}
-                    onChange={handleChange}
-                    placeholder="Select player"
-                    isDisabled={loading}
-                  >
-                    {users.map(user => (
-                      <option key={`team2Defense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (DEF: {user.elo_defense || 1500})
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Offense Player</FormLabel>
-                  <Select
-                    name="team2Offense"
-                    value={selectedPlayers.team2Offense}
-                    onChange={handleChange}
-                    placeholder="Select player"
-                    isDisabled={loading}
-                  >
-                    {users.map(user => (
-                      <option key={`team2Offense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (OFF: {user.elo_offense || 1500})
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            </SimpleGrid>
-          </Box>
-          
-          {selectedPlayers.team1Defense && 
-           selectedPlayers.team1Offense && 
-           selectedPlayers.team2Defense && 
-           selectedPlayers.team2Offense && (
+          <Heading as="h3" size="lg" mb={4} color="gray.700">Team Configuration</Heading>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={8}>
+            <Card variant="outline">
+              <CardHeader pb={2}><Heading size="md" textAlign="center" color="blue.600">Team 1</Heading></CardHeader>
+              <CardBody pt={2}>
+                {renderPlayerSelect('team1', 'Defense')}
+                {renderPlayerSelect('team1', 'Offense')}
+              </CardBody>
+            </Card>
+            <Card variant="outline">
+              <CardHeader pb={2}><Heading size="md" textAlign="center" color="orange.600">Team 2</Heading></CardHeader>
+              <CardBody pt={2}>
+                {renderPlayerSelect('team2', 'Defense')}
+                {renderPlayerSelect('team2', 'Offense')}
+              </CardBody>
+            </Card>
+          </SimpleGrid>
+
+          {allPlayersSelected && (
             <>
-              <Divider my={6} />
-              <Box mb={8}>
-                <Heading as="h3" size="md" mb={4}>Win Probability</Heading>
-                <Flex direction={{ base: "column", md: "row" }} gap={4}>
-                  <Stat flex="1" border="1px" borderColor="blue.100" p={3} borderRadius="md" bg="blue.50">
-                    <StatLabel>Team 1</StatLabel>
-                    <StatNumber>{matchPrediction.team1Probability}%</StatNumber>
-                    <StatHelpText>
-                      {getPlayerName(selectedPlayers.team1Defense)} & {getPlayerName(selectedPlayers.team1Offense)}
-                    </StatHelpText>
-                  </Stat>
-                  <Stat flex="1" border="1px" borderColor="gray.200" p={3} borderRadius="md" bg="rgba(245, 240, 225, 0.5)">
-                    <StatLabel>Team 2</StatLabel>
-                    <StatNumber>{matchPrediction.team2Probability}%</StatNumber>
-                    <StatHelpText>
-                      {getPlayerName(selectedPlayers.team2Defense)} & {getPlayerName(selectedPlayers.team2Offense)}
-                    </StatHelpText>
-                  </Stat>
-                </Flex>
-              </Box>
+              <Divider my={8} borderColor="gray.300"/>
+              <Heading as="h3" size="lg" mb={6} textAlign="center" color="gray.700">Prediction Analysis</Heading>
+
+              <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6} mb={6}>
+                <Card variant="outline">
+                  <CardHeader><Heading size="md" color="blue.700">{team1DisplayName}</Heading></CardHeader>
+                  <CardBody>
+                    {renderPlayerCard(selectedPlayers.team1Defense, "Defense")}
+                    {renderPlayerCard(selectedPlayers.team1Offense, "Offense")}
+                    <Text mt={2} fontWeight="bold">Base Team ELO: <Tag colorScheme="blue">{baseTeam1Rating}</Tag></Text>
+                  </CardBody>
+                </Card>
+                <Card variant="outline">
+                  <CardHeader><Heading size="md" color="orange.700">{team2DisplayName}</Heading></CardHeader>
+                  <CardBody>
+                    {renderPlayerCard(selectedPlayers.team2Defense, "Defense")}
+                    {renderPlayerCard(selectedPlayers.team2Offense, "Offense")}
+                    <Text mt={2} fontWeight="bold">Base Team ELO: <Tag colorScheme="orange">{baseTeam2Rating}</Tag></Text>
+                  </CardBody>
+                </Card>
+              </SimpleGrid>
               
-              <Box mb={8}>
-                <Heading as="h3" size="md" mb={4}>Predicted Score</Heading>
-                <Flex 
-                  p={4} 
-                  borderRadius="lg" 
-                  bg="gray.50" 
-                  justify="center"
-                  align="center"
-                  fontSize="2xl"
-                  fontWeight="bold"
-                >
-                  <Text color="blue.500">{matchPrediction.predictedScore.team1}</Text>
-                  <Text mx={4}>-</Text>
-                  <Text color="orange.500">{matchPrediction.predictedScore.team2}</Text>
-                </Flex>
-              </Box>
-              
-              <Box>
-                <Heading as="h3" size="md" mb={4}>Team Comparison</Heading>
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                  <Box>
-                    <Text fontWeight="bold" mb={2}>Team 1 (Average ELO: {matchPrediction.team1Rating})</Text>
-                    <Table variant="simple" size="sm" mt={4}>
-                      <Thead>
-                        <Tr>
-                          <Th>Player</Th>
-                          <Th isNumeric>Rating</Th>
-                          <Th isNumeric>Role</Th>
-                          <Th isNumeric>Games</Th>
-                          <Th isNumeric>Win %</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        <Tr>
-                          <Td>{getPlayerName(selectedPlayers.team1Defense)}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Defense)?.defenseElo}</Td>
-                          <Td isNumeric>Defense</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Defense)?.played}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Defense)?.winRate}%</Td>
-                        </Tr>
-                        <Tr>
-                          <Td>{getPlayerName(selectedPlayers.team1Offense)}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Offense)?.offenseElo}</Td>
-                          <Td isNumeric>Offense</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Offense)?.played}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Offense)?.winRate}%</Td>
-                        </Tr>
-                      </Tbody>
-                    </Table>
-                  </Box>
-                  
-                  <Box>
-                    <Text fontWeight="bold" mb={2}>Team 2 (Average ELO: {matchPrediction.team2Rating})</Text>
-                    <Table variant="simple" size="sm" mt={4}>
-                      <Thead>
-                        <Tr>
-                          <Th>Player</Th>
-                          <Th isNumeric>Rating</Th>
-                          <Th isNumeric>Role</Th>
-                          <Th isNumeric>Games</Th>
-                          <Th isNumeric>Win %</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        <Tr>
-                          <Td>{getPlayerName(selectedPlayers.team2Defense)}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Defense)?.defenseElo}</Td>
-                          <Td isNumeric>Defense</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Defense)?.played}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Defense)?.winRate}%</Td>
-                        </Tr>
-                        <Tr>
-                          <Td>{getPlayerName(selectedPlayers.team2Offense)}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Offense)?.offenseElo}</Td>
-                          <Td isNumeric>Offense</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Offense)?.played}</Td>
-                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Offense)?.winRate}%</Td>
-                        </Tr>
-                      </Tbody>
-                    </Table>
-                  </Box>
-                </SimpleGrid>
-              </Box>
+              {eloDifference !== null && (
+                <Text textAlign="center" fontSize="lg" fontWeight="semibold" mb={6}>
+                  Base ELO Difference (Team 1 - Team 2): 
+                  <Tag ml={2} colorScheme={eloDifference > 0 ? "green" : eloDifference < 0 ? "red" : "gray"} size="lg">
+                    {eloDifference > 0 ? `+${eloDifference}` : eloDifference}
+                  </Tag>
+                </Text>
+              )}
+
+              {renderPredictionScenario(scenarioTeam1White, team1DisplayName, team2DisplayName, `Scenario: ${team1DisplayName} (White) vs ${team2DisplayName} (Blue)`)}
+              {renderPredictionScenario(scenarioTeam2White, team1DisplayName, team2DisplayName, `Scenario: ${team1DisplayName} (Blue) vs ${team2DisplayName} (White)`)}
+
+              <Divider my={8} borderColor="gray.300"/>
+              <Heading as="h4" size="md" mb={4}>Recent Head-to-Head Encounters</Heading>
+              {loadingRecentMatches ? (
+                <Flex justify="center"><Spinner color="teal.500" /></Flex>
+              ) : recentMatches.length > 0 ? (
+                <Table variant="simple" size="sm">
+                  <Thead>
+                    <Tr>
+                      <Th>Date</Th>
+                      <Th textAlign="center">{team1DisplayName}</Th>
+                      <Th textAlign="center">{team2DisplayName}</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {recentMatches.map((match, index) => (
+                      <Tr key={index}>
+                        <Td>{new Date(match.date).toLocaleDateString()}</Td>
+                        <Td textAlign="center" fontWeight={match.team1Score > match.team2Score ? "bold" : "normal"} color={match.team1Score > match.team2Score ? "green.500" : "inherit"}>{match.team1Score}</Td>
+                        <Td textAlign="center" fontWeight={match.team2Score > match.team1Score ? "bold" : "normal"} color={match.team2Score > match.team1Score ? "green.500" : "inherit"}>{match.team2Score}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              ) : (
+                <Text>No recent direct encounters found between these exact teams.</Text>
+              )}
             </>
           )}
         </>
