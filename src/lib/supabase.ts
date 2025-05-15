@@ -415,45 +415,28 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
     });
     
     const opponentUsers = opposingTeamPlayers.map(p => userMap[p.user_id]).filter(u => u); // Filter out undefined users
-    // Deduplicate opponent users based on id to avoid listing same opponent twice if they are on offense and defense of same team (not typical for this schema but good practice)
     const uniqueOpponents = Array.from(new Set(opponentUsers.map(u => u.id)))
                                .map(id => opponentUsers.find(u => u.id === id)); 
 
-    // Determine match outcome for the selected player's team
-    const isPlayerTeamBlue = playerSpecificTeam.color === TeamColor.BLUE;
-    const teamScore = isPlayerTeamBlue ? match.team_blue_score : match.team_white_score;
-    const opponentScore = isPlayerTeamBlue ? match.team_white_score : match.team_blue_score;
-    const won = teamScore > opponentScore;
+    // Determine match outcome and score directly from TeamPlayer's scored/conceded fields
+    const playerScoreInMatch = tp.scored;
+    const opponentScoreInMatch = tp.conceded;
 
-    // Format the score string
-    let formattedScore;
-    if (won) {
-      formattedScore = `${teamScore}-${opponentScore}`;
-    } else if (teamScore === opponentScore) {
-      formattedScore = `${teamScore}-${opponentScore}`; // Draw
-    } else {
-      formattedScore = `${teamScore}-${opponentScore}`;
-    }
-    // The original formatting logic which forces one score to 10 if not a draw. Re-evaluate if this is desired.
-    // if (won) {
-    //   formattedScore = `10-${opponentScore}`;
-    // } else if (teamScore === opponentScore) {
-    //   formattedScore = `${teamScore}-${opponentScore}`; // Draw
-    // } else {
-    //   formattedScore = `${teamScore}-10`;
-    // }
+    const won = playerScoreInMatch > opponentScoreInMatch;
+    const resultString = won ? 'Win' : (playerScoreInMatch === opponentScoreInMatch ? 'Draw' : 'Loss');
+    const formattedScoreString = `${playerScoreInMatch}-${opponentScoreInMatch}`;
 
     return {
       id: tp.id,
       date: match.created_at,
-      result: won ? 'Win' : teamScore === opponentScore ? 'Draw' : 'Loss',
-      score: formattedScore,
+      result: resultString,
+      score: formattedScoreString,
       eloChange: tp.new_elo - tp.old_elo,
       oldElo: tp.old_elo,
       newElo: tp.new_elo,
-      scored: tp.scored, // This is individual player stats from TeamPlayer table, might not be team score.
-      conceded: tp.conceded, // Same as above.
-      teammate: teammate ? teammate.name : '-', // Use '-' if no teammate (e.g. 1v1, though schema implies 2v2)
+      scored: tp.scored, 
+      conceded: tp.conceded, 
+      teammate: teammate ? teammate.name : '-', 
       opponents: uniqueOpponents.length > 0 ? uniqueOpponents.map(o => o ? o.name : 'Unknown').join(' & ') : 'Unknown Opponents'
     };
   }).filter(matchHistoryEntry => matchHistoryEntry !== null); // Filter out null entries from map
