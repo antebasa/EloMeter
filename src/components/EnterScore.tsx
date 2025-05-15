@@ -31,7 +31,7 @@ import {
   AlertDescription
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
-import { getUsers, insertSampleUsers, saveMatch } from "../lib/supabase";
+import { getUsers, saveMatch } from "../lib/supabase";
 import type { User, MatchData } from "../lib/supabase";
 
 interface EnterScoreProps {

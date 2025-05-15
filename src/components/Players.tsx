@@ -21,7 +21,14 @@ import {
   Avatar,
   Alert,
   AlertIcon,
-  Tooltip
+  AlertTitle,
+  AlertDescription,
+  Tooltip,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel
 } from "@chakra-ui/react";
 import { getUsers, getPlayerMatchHistory } from "../lib/supabase";
 import type { User } from "../lib/supabase";
@@ -30,18 +37,7 @@ import type { User } from "../lib/supabase";
 interface PlayerWithStats extends User {
   winPercentage: number;
   recentForm: ('W' | 'L' | 'D')[];
-  combinedElo: number; // Combined ELO for sorting and display
 }
-
-// Calculate a combined ELO score with weighted offense/defense
-const calculateCombinedElo = (
-  offenseElo: number = 1500, 
-  defenseElo: number = 1500, 
-  offenseWeight: number = 0.6
-): number => {
-  const defenseWeight = 1 - offenseWeight;
-  return Math.round((offenseElo * offenseWeight) + (defenseElo * defenseWeight));
-};
 
 export const Players = () => {
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
@@ -52,7 +48,8 @@ export const Players = () => {
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerWithStats;
     direction: 'ascending' | 'descending';
-  }>({ key: 'combinedElo', direction: 'descending' });
+  }>({ key: 'elo_offense', direction: 'descending' });
+  const [activeTab, setActiveTab] = useState(0); // 0 for offense, 1 for defense
 
   useEffect(() => {
     async function loadUsers() {
@@ -60,14 +57,13 @@ export const Players = () => {
         setLoading(true);
         const fetchedUsers = await getUsers();
         
-        // Process each user to get their recent form and calculate combined ELO
+        // Process each user to get their recent form
         const playersWithRecentForm = await Promise.all(
           fetchedUsers.map(async (user) => {
             if (!user.id) return { 
               ...user, 
               winPercentage: 0, 
-              recentForm: [],
-              combinedElo: 1500
+              recentForm: []
             };
             
             try {
@@ -85,32 +81,25 @@ export const Players = () => {
                 match.result === 'Win' ? 'W' : match.result === 'Draw' ? 'D' : 'L'
               ) as ('W' | 'L' | 'D')[];
               
-              // Calculate combined ELO score
-              const offenseElo = user.elo_offense || 1500;
-              const defenseElo = user.elo_defense || 1500;
-              const combinedElo = calculateCombinedElo(offenseElo, defenseElo);
-              
               return {
                 ...user,
                 winPercentage,
-                recentForm,
-                combinedElo
+                recentForm
               };
             } catch (error) {
               console.error(`Error fetching data for player ${user.id}:`, error);
               return {
                 ...user,
                 winPercentage: 0,
-                recentForm: [],
-                combinedElo: calculateCombinedElo(user.elo_offense, user.elo_defense)
+                recentForm: []
               };
             }
           })
         );
         
-        // Sort initially by combined ELO score descending
+        // Initial sort by offense ELO
         const sortedPlayers = [...playersWithRecentForm].sort((a, b) => 
-          (b.combinedElo || 0) - (a.combinedElo || 0)
+          (b.elo_offense || 0) - (a.elo_offense || 0)
         );
         
         setPlayers(sortedPlayers);
@@ -168,6 +157,16 @@ export const Players = () => {
     setFilteredPlayers(sortedPlayers);
   };
 
+  const handleTabChange = (index: number) => {
+    setActiveTab(index);
+    // Reset sort config based on active tab
+    if (index === 0) { // Offense tab
+      handleSort('elo_offense');
+    } else { // Defense tab
+      handleSort('elo_defense');
+    }
+  };
+
   const renderSortIcon = (key: keyof PlayerWithStats) => {
     if (sortConfig.key !== key) {
       return null;
@@ -198,31 +197,30 @@ export const Players = () => {
     );
   };
 
-  const renderEloRatings = (player: PlayerWithStats) => {
-    const offenseElo = player.elo_offense || 1500;
-    const defenseElo = player.elo_defense || 1500;
-    const combinedElo = player.combinedElo;
-    
+  if (loading) {
     return (
-      <Tooltip 
-        label={`Combined: ${combinedElo} (60% offense, 40% defense)`} 
-        placement="top"
-      >
-        <HStack spacing={2}>
-          <Badge colorScheme="purple" fontSize="md">
-            {combinedElo}
-          </Badge>
-          <Text fontSize="xs" color="gray.500">
-            (O: {offenseElo} / D: {defenseElo})
-          </Text>
-        </HStack>
-      </Tooltip>
+      <Box textAlign="center" py={10}>
+        <Spinner size="xl" />
+        <Text mt={4}>Loading players...</Text>
+      </Box>
     );
-  };
+  }
+
+  if (error) {
+    return (
+      <Alert status="error" borderRadius="md">
+        <AlertIcon />
+        <Box>
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Box>
+      </Alert>
+    );
+  }
 
   return (
-    <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
-      <Heading as="h2" size="lg" mb={6}>Player Rankings</Heading>
+    <Box p={5}>
+      <Heading as="h1" size="xl" mb={6}>Player Rankings</Heading>
       
       <InputGroup mb={6}>
         <InputLeftElement pointerEvents="none">
@@ -230,85 +228,126 @@ export const Players = () => {
         </InputLeftElement>
         <Input 
           placeholder="Search players..." 
-          value={searchTerm}
+          value={searchTerm} 
           onChange={(e) => setSearchTerm(e.target.value)}
+          borderRadius="full"
+          bg="white"
+          boxShadow="sm"
         />
       </InputGroup>
-      
-      {error && (
-        <Alert status="error" mb={4} borderRadius="md">
-          <AlertIcon />
-          <Text>{error}</Text>
-        </Alert>
-      )}
-      
-      {loading ? (
-        <Flex justify="center" py={8}>
-          <Spinner size="xl" />
-        </Flex>
-      ) : (
-        <Box overflowX="auto">
-          <Table variant="simple">
-            <Thead>
-              <Tr>
-                <Th>#</Th>
-                <Th>Player</Th>
-                <Th onClick={() => handleSort('combinedElo')} cursor="pointer">
-                  ELO Rating {renderSortIcon('combinedElo')}
-                </Th>
-                <Th onClick={() => handleSort('elo_offense')} cursor="pointer">
-                  Offense {renderSortIcon('elo_offense')}
-                </Th>
-                <Th onClick={() => handleSort('elo_defense')} cursor="pointer">
-                  Defense {renderSortIcon('elo_defense')}
-                </Th>
-                <Th onClick={() => handleSort('played')} cursor="pointer">
-                  Games {renderSortIcon('played')}
-                </Th>
-                <Th onClick={() => handleSort('winPercentage')} cursor="pointer">
-                  Win % {renderSortIcon('winPercentage')}
-                </Th>
-                <Th>Recent Form</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {filteredPlayers.map((player, index) => (
-                <Tr key={player.id}>
-                  <Td>{index + 1}</Td>
-                  <Td>
-                    <HStack>
-                      <Avatar size="sm" name={player.name} bg="blue.500" />
-                      <Text fontWeight="medium">{player.name}</Text>
-                    </HStack>
-                  </Td>
-                  <Td>
-                    {renderEloRatings(player)}
-                  </Td>
-                  <Td>
-                    <Badge colorScheme="green">{player.elo_offense || 1500}</Badge>
-                  </Td>
-                  <Td>
-                    <Badge colorScheme="blue">{player.elo_defense || 1500}</Badge>
-                  </Td>
-                  <Td>{player.played || 0}</Td>
-                  <Td>
-                    <Badge colorScheme={player.winPercentage >= 50 ? 'green' : 'orange'}>
-                      {player.winPercentage}%
-                    </Badge>
-                  </Td>
-                  <Td>{renderRecentForm(player.recentForm)}</Td>
+
+      <Tabs variant="enclosed" colorScheme="blue" onChange={handleTabChange} index={activeTab}>
+        <TabList>
+          <Tab fontWeight="bold">Offense Rankings</Tab>
+          <Tab fontWeight="bold">Defense Rankings</Tab>
+        </TabList>
+        
+        <TabPanels>
+          {/* Offense Tab */}
+          <TabPanel>
+            <Table variant="simple" size="md" bg="white" boxShadow="sm" borderRadius="md" overflow="hidden">
+              <Thead bg="gray.50">
+                <Tr>
+                  <Th width="10%">Rank</Th>
+                  <Th width="25%">Player</Th>
+                  <Th width="15%" cursor="pointer" onClick={() => handleSort('elo_offense')}>
+                    Offense ELO {renderSortIcon('elo_offense')}
+                  </Th>
+                  <Th width="10%" cursor="pointer" onClick={() => handleSort('winPercentage')}>
+                    Win % {renderSortIcon('winPercentage')}
+                  </Th>
+                  <Th width="10%" cursor="pointer" onClick={() => handleSort('played')}>
+                    Matches {renderSortIcon('played')}
+                  </Th>
+                  <Th width="15%" cursor="pointer" onClick={() => handleSort('goals')}>
+                    Goals {renderSortIcon('goals')}
+                  </Th>
+                  <Th width="15%">Form</Th>
                 </Tr>
-              ))}
-            </Tbody>
-          </Table>
+              </Thead>
+              <Tbody>
+                {filteredPlayers
+                  .sort((a, b) => (b.elo_offense || 0) - (a.elo_offense || 0)) // Ensure sorted by offense ELO
+                  .map((player, index) => (
+                    <Tr key={player.id} _hover={{ bg: "gray.50" }}>
+                      <Td>{index + 1}</Td>
+                      <Td>
+                        <Flex align="center">
+                          <Avatar size="sm" name={player.name} mr={2} />
+                          <Text fontWeight="medium">{player.name}</Text>
+                        </Flex>
+                      </Td>
+                      <Td isNumeric fontWeight="bold">{player.elo_offense || 1400}</Td>
+                      <Td isNumeric>{player.winPercentage}%</Td>
+                      <Td isNumeric>{player.played || 0}</Td>
+                      <Td isNumeric>{player.goals || 0}</Td>
+                      <Td>{renderRecentForm(player.recentForm)}</Td>
+                    </Tr>
+                  ))}
+                {filteredPlayers.length === 0 && (
+                  <Tr>
+                    <Td colSpan={7} textAlign="center" py={4}>
+                      No players found
+                    </Td>
+                  </Tr>
+                )}
+              </Tbody>
+            </Table>
+          </TabPanel>
           
-          {filteredPlayers.length === 0 && !loading && (
-            <Box textAlign="center" py={8}>
-              <Text>No players found matching your search.</Text>
-            </Box>
-          )}
-        </Box>
-      )}
+          {/* Defense Tab */}
+          <TabPanel>
+            <Table variant="simple" size="md" bg="white" boxShadow="sm" borderRadius="md" overflow="hidden">
+              <Thead bg="gray.50">
+                <Tr>
+                  <Th width="10%">Rank</Th>
+                  <Th width="25%">Player</Th>
+                  <Th width="15%" cursor="pointer" onClick={() => handleSort('elo_defense')}>
+                    Defense ELO {renderSortIcon('elo_defense')}
+                  </Th>
+                  <Th width="10%" cursor="pointer" onClick={() => handleSort('winPercentage')}>
+                    Win % {renderSortIcon('winPercentage')}
+                  </Th>
+                  <Th width="10%" cursor="pointer" onClick={() => handleSort('played')}>
+                    Matches {renderSortIcon('played')}
+                  </Th>
+                  <Th width="15%" cursor="pointer" onClick={() => handleSort('conceded')}>
+                    Conceded {renderSortIcon('conceded')}
+                  </Th>
+                  <Th width="15%">Form</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {filteredPlayers
+                  .sort((a, b) => (b.elo_defense || 0) - (a.elo_defense || 0)) // Ensure sorted by defense ELO
+                  .map((player, index) => (
+                    <Tr key={player.id} _hover={{ bg: "gray.50" }}>
+                      <Td>{index + 1}</Td>
+                      <Td>
+                        <Flex align="center">
+                          <Avatar size="sm" name={player.name} mr={2} />
+                          <Text fontWeight="medium">{player.name}</Text>
+                        </Flex>
+                      </Td>
+                      <Td isNumeric fontWeight="bold">{player.elo_defense || 1400}</Td>
+                      <Td isNumeric>{player.winPercentage}%</Td>
+                      <Td isNumeric>{player.played || 0}</Td>
+                      <Td isNumeric>{player.conceded || 0}</Td>
+                      <Td>{renderRecentForm(player.recentForm)}</Td>
+                    </Tr>
+                  ))}
+                {filteredPlayers.length === 0 && (
+                  <Tr>
+                    <Td colSpan={7} textAlign="center" py={4}>
+                      No players found
+                    </Td>
+                  </Tr>
+                )}
+              </Tbody>
+            </Table>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Box>
   );
 }; 
