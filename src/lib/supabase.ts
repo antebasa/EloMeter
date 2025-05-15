@@ -401,7 +401,10 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       scored_by_team: pms.scored,
       conceded_by_team: pms.conceded,
       teammate: teammateName,
-      opponents: opponentsString
+      opponents: opponentsString,
+      player_team_id_in_match: playerTeamDetails.id,
+      match_details_white_team_id: matchDetails.white_team_id,
+      match_details_blue_team_id: matchDetails.blue_team_id
     };
   }).filter(Boolean);
 }
@@ -546,5 +549,94 @@ export async function getMatchHistoryBetweenTeams(
   } catch (error) {
     console.error('Error in getMatchHistoryBetweenTeams:', error);
     return [];
+  }
+}
+
+// New function for historical matchup stats by color
+export interface HistoricalMatchupStats {
+  teamA_as_white: { wins: number; losses: number; draws: number; total_played: number };
+  teamA_as_blue: { wins: number; losses: number; draws: number; total_played: number };
+}
+
+export async function getHistoricalMatchupStatsByColor(
+  teamAPlayer1Id: number,
+  teamAPlayer2Id: number,
+  teamBPlayer1Id: number,
+  teamBPlayer2Id: number
+): Promise<HistoricalMatchupStats> {
+  const result: HistoricalMatchupStats = {
+    teamA_as_white: { wins: 0, losses: 0, draws: 0, total_played: 0 },
+    teamA_as_blue: { wins: 0, losses: 0, draws: 0, total_played: 0 },
+  };
+
+  try {
+    const teamA_u1 = Math.min(teamAPlayer1Id, teamAPlayer2Id);
+    const teamA_u2 = Math.max(teamAPlayer1Id, teamAPlayer2Id);
+    const teamB_u1 = Math.min(teamBPlayer1Id, teamBPlayer2Id);
+    const teamB_u2 = Math.max(teamBPlayer1Id, teamBPlayer2Id);
+
+    // Get Team ID for Team A
+    const { data: teamAData, error: teamAError } = await supabase
+      .from('Team')
+      .select('id')
+      .eq('user1_id', teamA_u1)
+      .eq('user2_id', teamA_u2)
+      .maybeSingle();
+
+    if (teamAError) throw teamAError;
+    if (!teamAData) return result; // Team A not found
+    const teamAId = teamAData.id;
+
+    // Get Team ID for Team B
+    const { data: teamBData, error: teamBError } = await supabase
+      .from('Team')
+      .select('id')
+      .eq('user1_id', teamB_u1)
+      .eq('user2_id', teamB_u2)
+      .maybeSingle();
+
+    if (teamBError) throw teamBError;
+    if (!teamBData) return result; // Team B not found
+    const teamBId = teamBData.id;
+
+    // Fetch matches where Team A was White and Team B was Blue
+    const { data: teamAWhiteMatches, error: teamAWhiteError } = await supabase
+      .from('Match')
+      .select('team_white_score, team_blue_score')
+      .eq('white_team_id', teamAId)
+      .eq('blue_team_id', teamBId);
+
+    if (teamAWhiteError) console.error('Error fetching Team A white matches:', teamAWhiteError);
+    else if (teamAWhiteMatches) {
+      teamAWhiteMatches.forEach(match => {
+        result.teamA_as_white.total_played++;
+        if (match.team_white_score > match.team_blue_score) result.teamA_as_white.wins++;
+        else if (match.team_white_score < match.team_blue_score) result.teamA_as_white.losses++;
+        else result.teamA_as_white.draws++;
+      });
+    }
+
+    // Fetch matches where Team A was Blue and Team B was White
+    const { data: teamABlueMatches, error: teamABlueError } = await supabase
+      .from('Match')
+      .select('team_white_score, team_blue_score')
+      .eq('blue_team_id', teamAId) 
+      .eq('white_team_id', teamBId);
+
+    if (teamABlueError) console.error('Error fetching Team A blue matches:', teamABlueError);
+    else if (teamABlueMatches) {
+      teamABlueMatches.forEach(match => {
+        result.teamA_as_blue.total_played++;
+        // Team A is Blue, so team_blue_score is their score
+        if (match.team_blue_score > match.team_white_score) result.teamA_as_blue.wins++;
+        else if (match.team_blue_score < match.team_white_score) result.teamA_as_blue.losses++;
+        else result.teamA_as_blue.draws++;
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error in getHistoricalMatchupStatsByColor:', error);
+    return result; // Return default empty stats on major error
   }
 }

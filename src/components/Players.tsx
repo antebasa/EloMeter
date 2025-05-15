@@ -46,35 +46,29 @@ interface User extends SupabaseUser {
   avatar_url?: string;
 }
 
-interface MatchDetails {
-  white_team_id: number;
-  blue_team_id: number;
-  // Add other relevant match details if present
-}
-
-interface MatchHistoryEntry {
-  myTeamId: number;
-  myTeamPlayers: string[];
-  opponentTeamId: number;
-  opponentTeamPlayers: string[];
-  myTeamScore: number;
-  opponentTeamScore: number;
-  result: 'Win' | 'Loss' | 'Draw';
+// Updated to match the structure returned by getPlayerMatchHistory
+interface MatchHistoryDisplayEntry {
+  id: number; // PlayerMatchStats ID
+  match_db_id: number; // Match ID from Match table
   date: string;
-  eloChange?: number; // Made optional as it might not always be present if not calculated
-  eloChangeOffense?: number; // Made optional
-  oldElo?: number;
-  newElo?: number;
-  oldEloOffense?: number;
-  newEloOffense?: number;
-  matchDetails?: MatchDetails; // Optional if not always joined
-  // Ensure all fields used in renderRecentForm are here
+  result: 'Win' | 'Loss' | 'Draw';
+  score: string; // e.g., "10-5"
+  eloChange: number;
+  oldElo: number;
+  newElo: number;
+  // scored_by_team: number; // Available from getPlayerMatchHistory if needed
+  // conceded_by_team: number; // Available from getPlayerMatchHistory if needed
+  teammate: string;
+  opponents: string;
+  // For popover, we need to know the player's team ID in this match and the match's white/blue team IDs
+  myTeamIdInMatch: number; 
+  matchWhiteTeamId: number;
+  matchBlueTeamId: number;
 }
 
-// Extended player type with statistics
 interface PlayerWithStats extends User {
   winPercentage: number;
-  recentFormDetailed: MatchHistoryEntry[];
+  recentFormDetailed: MatchHistoryDisplayEntry[];
 }
 
 export const Players = () => {
@@ -88,6 +82,9 @@ export const Players = () => {
   const popoverColor = useColorModeValue("gray.800", "whiteAlpha.900");
   const noRecentMatchesColor = useColorModeValue("gray.500", "gray.400");
   const searchIconColor = useColorModeValue("gray.400", "gray.300");
+  const headingColor = useColorModeValue("gray.700", "white");
+  const inactiveTabColor = useColorModeValue("gray.600", "gray.400");
+  const selectedTabColor = useColorModeValue("teal.600", "teal.300");
 
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [filteredPlayers, setFilteredPlayers] = useState<PlayerWithStats[]>([]);
@@ -116,13 +113,31 @@ export const Players = () => {
             };
             
             try {
-              const matchHistory: MatchHistoryEntry[] = await getPlayerMatchHistory(user.id);
+              // getPlayerMatchHistory now returns an array of objects that should somewhat match MatchHistoryDisplayEntry
+              // We need to ensure the fields required by MatchHistoryDisplayEntry are present or mapped.
+              const rawMatchHistory = await getPlayerMatchHistory(user.id);
+              
+              const processedMatchHistory: MatchHistoryDisplayEntry[] = rawMatchHistory.map((match: any) => ({
+                id: match.id, // This is PlayerMatchStats.id
+                match_db_id: match.match_db_id,
+                date: match.date,
+                result: match.result,
+                score: match.score,
+                eloChange: match.eloChange,
+                oldElo: match.oldElo,
+                newElo: match.newElo,
+                teammate: match.teammate,
+                opponents: match.opponents,
+                myTeamIdInMatch: match.player_team_id_in_match, 
+                matchWhiteTeamId: match.match_details_white_team_id, 
+                matchBlueTeamId: match.match_details_blue_team_id,
+              }));
               
               const wins = user.wins || 0;
               const played = user.played || 0;
               const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
               
-              const recentMatchesDetailed: MatchHistoryEntry[] = matchHistory.slice(0, 5);
+              const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.slice(0, 5);
               
               return {
                 ...user,
@@ -130,8 +145,8 @@ export const Players = () => {
                 recentFormDetailed: recentMatchesDetailed
               };
             } catch (fetchError) {
-              console.error(`Error fetching match history for player ${user.id}:`, fetchError);
-              return { // Return basic user data even if match history fails
+              console.error(`Error fetching/processing match history for player ${user.id}:`, fetchError);
+              return { 
                 ...user,
                 winPercentage: 0,
                 recentFormDetailed: []
@@ -140,16 +155,15 @@ export const Players = () => {
           })
         );
         
-        // Default sort based on the active tab after loading
-        let sortedPlayers = [...playersWithRecentForm];
-        if (activeTab === 0) { // Offense
-          sortedPlayers.sort((a, b) => (b.elo_offense || 0) - (a.elo_offense || 0));
-        } else { // Defense
-          sortedPlayers.sort((a, b) => (b.elo_defense || 0) - (a.elo_defense || 0));
+        let sortedPlayersList = [...playersWithRecentForm];
+        if (activeTab === 0) { 
+          sortedPlayersList.sort((a, b) => (b.elo_offense || 0) - (a.elo_offense || 0));
+        } else { 
+          sortedPlayersList.sort((a, b) => (b.elo_defense || 0) - (a.elo_defense || 0));
         }
         
-        setPlayers(sortedPlayers);
-        setFilteredPlayers(sortedPlayers);
+        setPlayers(sortedPlayersList);
+        setFilteredPlayers(sortedPlayersList);
       } catch (err) {
         console.error("Error loading users:", err);
         setError("Failed to load players. Please try again later.");
@@ -159,7 +173,7 @@ export const Players = () => {
     }
 
     loadUsers();
-  }, []); // Removed activeTab from dependencies to prevent re-fetching on tab change, sorting is handled by handleTabChange
+  }, []); 
 
   useEffect(() => {
     if (searchTerm.trim() === '') {
@@ -181,10 +195,9 @@ export const Players = () => {
     setSortConfig({ key, direction });
     
     const sorted = [...filteredPlayers].sort((a, b) => {
-      const aValue = a[key] as any; // Type assertion for comparison
-      const bValue = b[key] as any; // Type assertion for comparison
+      const aValue = a[key] as any; 
+      const bValue = b[key] as any; 
       
-      // Handle cases where ELO might be null or undefined, treating them as low values for sorting
       const valA = aValue === null || aValue === undefined ? (direction === 'ascending' ? Infinity : -Infinity) : aValue;
       const valB = bValue === null || bValue === undefined ? (direction === 'ascending' ? Infinity : -Infinity) : bValue;
 
@@ -201,21 +214,19 @@ export const Players = () => {
 
   const handleTabChange = (index: number) => {
     setActiveTab(index);
-    // Apply default sort for the new tab and resort the *original* full list of players
     const keyToSort = index === 0 ? 'elo_offense' : 'elo_defense';
     setSortConfig({ key: keyToSort, direction: 'descending' });
 
-    const sortedPlayers = [...players].sort((a, b) => {
+    const sortedPlayersList = [...players].sort((a, b) => {
         const aValue = a[keyToSort] || 0;
         const bValue = b[keyToSort] || 0;
-        return bValue - aValue; // Descending
+        return bValue - aValue; 
     });
-    setPlayers(sortedPlayers); // Update the base players list with new sort
-    // Apply search term if it exists
+    setPlayers(sortedPlayersList); 
     if (searchTerm.trim() === '') {
-      setFilteredPlayers(sortedPlayers);
+      setFilteredPlayers(sortedPlayersList);
     } else {
-      const filtered = sortedPlayers.filter(player => 
+      const filtered = sortedPlayersList.filter(player => 
         player.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredPlayers(filtered);
@@ -227,7 +238,7 @@ export const Players = () => {
     return sortConfig.direction === 'ascending' ? ' ↑' : ' ↓';
   };
 
-  const renderRecentForm = (formDetailed: MatchHistoryEntry[]) => {
+  const renderRecentForm = (formDetailed: MatchHistoryDisplayEntry[]) => {
     if (!formDetailed || formDetailed.length === 0) {
       return <Text fontSize="sm" color={noRecentMatchesColor}>No recent matches</Text>;
     }
@@ -238,26 +249,17 @@ export const Players = () => {
           const resultChar = match.result === 'Win' ? 'W' : match.result === 'Draw' ? 'D' : 'L';
           const badgeColorScheme = match.result === 'Win' ? 'green' : match.result === 'Draw' ? 'yellow' : 'red';
           
-          const playerTeamColor = match.matchDetails && match.myTeamId === match.matchDetails.white_team_id ? 'White' : 
-                                 (match.matchDetails && match.myTeamId === match.matchDetails.blue_team_id ? 'Blue' : 'N/A');
-
-          const eloDefChange = (match.newElo !== undefined && match.oldElo !== undefined) ? (match.newElo - match.oldElo) : null;
-          const eloOffChange = (match.newEloOffense !== undefined && match.oldEloOffense !== undefined) ? (match.newEloOffense - match.oldEloOffense) : null;
-          
-          let eloChangeStringArr: string[] = [];
-          if (eloDefChange !== null) {
-            eloChangeStringArr.push(`Def: ${eloDefChange > 0 ? '+' : ''}${eloDefChange}`);
+          let playerTeamColor = 'N/A';
+          if (match.myTeamIdInMatch && match.matchWhiteTeamId && match.myTeamIdInMatch === match.matchWhiteTeamId) {
+            playerTeamColor = 'White';
+          } else if (match.myTeamIdInMatch && match.matchBlueTeamId && match.myTeamIdInMatch === match.matchBlueTeamId) {
+            playerTeamColor = 'Blue';
           }
-          if (eloOffChange !== null) {
-            eloChangeStringArr.push(`Off: ${eloOffChange > 0 ? '+' : ''}${eloOffChange}`);
-          }
-          const eloDisplayString = eloChangeStringArr.length > 0 ? eloChangeStringArr.join(' / ') : "N/A";
 
-          const myTeamPlayersDisplay = Array.isArray(match.myTeamPlayers) ? match.myTeamPlayers.join(' & ') : 'Unknown Players';
-          const opponentTeamPlayersDisplay = Array.isArray(match.opponentTeamPlayers) ? match.opponentTeamPlayers.join(' & ') : 'Unknown Players';
+          const eloChangeDisplay = match.eloChange > 0 ? `+${match.eloChange}` : `${match.eloChange}`;
 
           return (
-            <Popover key={`${match.date}-${index}-${match.myTeamId}`} trigger="hover" placement="top" isLazy>
+            <Popover key={`${match.match_db_id}-${index}`} trigger="hover" placement="top" isLazy>
               <PopoverTrigger>
                 <Badge 
                   colorScheme={badgeColorScheme} 
@@ -280,12 +282,12 @@ export const Players = () => {
                     Match Details ({new Date(match.date).toLocaleDateString()})
                   </PopoverHeader>
                   <PopoverBody fontSize="sm">
-                    <Text><strong>Your Team ({playerTeamColor}):</strong> {myTeamPlayersDisplay}</Text>
-                    <Text><strong>Opponent:</strong> {opponentTeamPlayersDisplay}</Text>
-                    <Text><strong>Score:</strong> {match.myTeamScore} - {match.opponentTeamScore} 
+                    <Text><strong>Your Team ({playerTeamColor}):</strong> {match.teammate}</Text>
+                    <Text><strong>Opponent:</strong> {match.opponents}</Text>
+                    <Text><strong>Score:</strong> {match.score} 
                       <Text as="span" fontWeight="bold" color={`${badgeColorScheme}.500`}> ({match.result})</Text>
                     </Text>
-                    <Text><strong>ELO Change:</strong> {eloDisplayString}</Text>
+                    <Text><strong>ELO Change:</strong> {eloChangeDisplay} (New: {match.newElo})</Text>
                   </PopoverBody>
                 </PopoverContent>
               </Portal>
@@ -319,7 +321,7 @@ export const Players = () => {
   
   return (
     <Box p={{ base: 2, md: 5 }} color={textColor}>
-      <Heading as="h1" size="xl" mb={6} textAlign="center">Player Rankings</Heading>
+      <Heading as="h1" size="xl" mb={6} textAlign="center" color={headingColor}>Player Rankings</Heading>
       
       <InputGroup mb={6} size="lg">
         <InputLeftElement pointerEvents="none">
@@ -337,8 +339,8 @@ export const Players = () => {
 
       <Tabs variant="soft-rounded" colorScheme="teal" onChange={handleTabChange} index={activeTab} isLazy>
         <TabList mb={4} justifyContent="center">
-          <Tab fontWeight="semibold">Offense Rankings</Tab>
-          <Tab fontWeight="semibold">Defense Rankings</Tab>
+          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Offense Rankings</Tab>
+          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Defense Rankings</Tab>
         </TabList>
         
         <TabPanels>
@@ -357,7 +359,7 @@ export const Players = () => {
                 </Thead>
                 <Tbody>
                   {filteredPlayers.map(player => (
-                    <Tr key={player.id} _hover={{ bg: rowHoverBg }} transition="background-color 0.2s ease-in-out" cursor="pointer" /* onClick={() => navigateToPlayerProfile(player.id)} */>
+                    <Tr key={player.id} _hover={{ bg: rowHoverBg }} transition="background-color 0.2s ease-in-out" cursor="pointer" >
                       <Td>
                         <Flex align="center">
                           <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
@@ -391,7 +393,7 @@ export const Players = () => {
                 </Thead>
                 <Tbody>
                   {filteredPlayers.map(player => (
-                    <Tr key={player.id} _hover={{ bg: rowHoverBg }} transition="background-color 0.2s ease-in-out" cursor="pointer" /* onClick={() => navigateToPlayerProfile(player.id)} */>
+                    <Tr key={player.id} _hover={{ bg: rowHoverBg }} transition="background-color 0.2s ease-in-out" cursor="pointer" >
                       <Td>
                         <Flex align="center">
                           <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
