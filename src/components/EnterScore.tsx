@@ -184,7 +184,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
   return (
     <Box maxWidth="500px" mx="auto" mt={10} p={6} borderRadius="lg" boxShadow="md" bg="white">
       <Flex align="center" mb={6}>
-        <Heading as="h2" size="lg" textAlign="center" flex="1">New Foosball Match</Heading>
+        <Heading as="h2" size="lg" textAlign="center" flex="1">Match result</Heading>
       </Flex>
 
       {error && (
@@ -203,8 +203,8 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
 
       <Box as="form" onSubmit={handleSubmit}>
         <SimpleGrid columns={2} spacing={6} mb={6}>
-          <Box bg="blue.50" p={4} borderRadius="md">
-            <Heading as="h3" size="md" mb={4} textAlign="center">Team 1</Heading>
+          <Box bg="white" borderWidth={'1px'} p={4} borderRadius="md">
+            <Heading as="h3" size="md" mb={4} textAlign="center">Team White</Heading>
             <FormControl mb={3} isRequired>
               <FormLabel>Defense Player</FormLabel>
               <Select
@@ -238,8 +238,8 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
               </Select>
             </FormControl>
           </Box>
-          <Box bg="rgba(245, 240, 225, 0.5)" p={4} borderRadius="md" borderColor="gray.200" borderWidth="1px">
-            <Heading as="h3" size="md" mb={4} textAlign="center">Team 2</Heading>
+          <Box bg="blue.50" p={4} borderRadius="md" borderColor="gray.200" borderWidth="1px">
+            <Heading as="h3" size="md" mb={4} textAlign="center">Team Blue</Heading>
             <FormControl mb={3} isRequired>
               <FormLabel>Defense Player</FormLabel>
               <Select

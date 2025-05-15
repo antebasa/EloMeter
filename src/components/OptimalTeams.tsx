@@ -361,10 +361,12 @@ export const OptimalTeams = () => {
                     value={player.id.toString()}
                     isDisabled={selectedPlayerIds.length >= 4 && !selectedPlayerIds.includes(player.id.toString())}
                   >
-                    <HStack>
+                    <HStack borderWidth={1} borderRadius={'4px'} padding={'8px'}>
                       <Text>{player.name}</Text>
-                      <Badge colorScheme="green" mr={1}>O: {player.elo_offense || 1400}</Badge>
-                      <Badge colorScheme="blue">D: {player.elo_defense || 1400}</Badge>
+                      <VStack>
+                        <Badge textAlign={'center'} width={'80px'} colorScheme="green">O: {player.elo_offense || 1400}</Badge>
+                        <Badge textAlign={'center'} width={'80px'} colorScheme="blue">D: {player.elo_defense || 1400}</Badge>
+                      </VStack>
                     </HStack>
                   </Checkbox>
                 ))}
@@ -398,7 +400,7 @@ export const OptimalTeams = () => {
                 Rating Difference: <Badge colorScheme={optimalTeamData.ratingDifference < 5 ? "green" : "yellow"}>{optimalTeamData.ratingDifference.toFixed(1)}</Badge> (Lower is more balanced based on skills)
               </Text>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={6}>
-                <Card variant="filled" bg={useColorModeValue("blue.50", "blue.800")}>
+                <Card variant="filled" borderWidth={'1px'} borderColor={'gray.200'} bg={useColorModeValue("white", "orange.800")}>
                   <CardHeader pb={0}>
                     <Heading size="md" textAlign="center">Team 1: {optimalTeamData.team1Roles.defense.name} & {optimalTeamData.team1Roles.offense.name}</Heading>
                   </CardHeader>
@@ -434,7 +436,7 @@ export const OptimalTeams = () => {
                   </CardBody>
                 </Card>
 
-                <Card variant="filled" bg={useColorModeValue("orange.50", "orange.800")}>
+                <Card variant="filled" bg={useColorModeValue("blue.50", "blue.800")}>
                   <CardHeader pb={0}>
                     <Heading size="md" textAlign="center">Team 2: {optimalTeamData.team2Roles.defense.name} & {optimalTeamData.team2Roles.offense.name}</Heading>
                   </CardHeader>

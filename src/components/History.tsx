@@ -47,7 +47,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
   const [showOffenseElo, setShowOffenseElo] = useState<boolean>(true);
   const [showDefenseElo, setShowDefenseElo] = useState<boolean>(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
-  console.log(error)
+  console.log(error, selectedPlayerIdProp)
   useEffect(() => {
     // Load the users when the component mounts
     async function loadUsers() {
@@ -57,7 +57,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
 
         // Set the first user as default selected player if there are users
         if (fetchedUsers.length > 0) {
-          setSelectedPlayer(fetchedUsers[0].id);
+          setSelectedPlayer(selectedPlayerIdProp ?? fetchedUsers[0].id);
         }
       } catch (err) {
         console.error("Error loading users:", err);

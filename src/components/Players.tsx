@@ -86,8 +86,8 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
   const popoverColor = useColorModeValue("gray.800", "whiteAlpha.900");
   const noRecentMatchesColor = useColorModeValue("gray.500", "gray.400");
   const searchIconColor = useColorModeValue("gray.400", "gray.300");
-  const headingColor = useColorModeValue("gray.700", "white");
-  const inactiveTabColor = useColorModeValue("gray.600", "gray.400");
+  const headingColor = useColorModeValue("white", "gray.700");
+  const inactiveTabColor = useColorModeValue("white", "gray.400");
   const selectedTabColor = useColorModeValue("teal.600", "teal.300");
 
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
