@@ -444,14 +444,14 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
 
     const now = new Date().toISOString();
     return [
-      {
-        x: now,
+      { 
+        x: now, 
         y: user.elo_offense || DEFAULT_ELO,
         id: 'initial',
         type: 'offense'
       },
-      {
-        x: now,
+      { 
+        x: now, 
         y: user.elo_defense || DEFAULT_ELO,
         id: 'initial',
         type: 'defense'
@@ -459,7 +459,7 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
     ];
   }
 
-  // Get the user to determine if the Elo is for offense or defense
+  // Get the user to determine current Elo values
   const { data: user, error: userError } = await supabase
     .from('User')
     .select('elo_offense, elo_defense')
@@ -470,25 +470,6 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
     console.error('Error fetching user for Elo history:', userError);
     return [];
   }
-
-  // Get team information to determine player position
-  const teamIds = teamPlayers.map(tp => tp.team_id);
-  const { data: teamPlayerPositions, error: positionsError } = await supabase
-    .from('TeamPlayer')
-    .select('id, team_id, position')
-    .eq('user_id', userId)
-    .in('team_id', teamIds);
-
-  if (positionsError || !teamPlayerPositions) {
-    console.error('Error fetching team player positions:', positionsError);
-    return [];
-  }
-
-  // Create a lookup for positions
-  const positionMap = teamPlayerPositions.reduce((acc, tp) => {
-    acc[tp.id] = tp.position;
-    return acc;
-  }, {} as Record<number, string>);
 
   // Create two separate series for offense and defense
   const offenseData: any[] = [];
@@ -513,24 +494,38 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
     type: 'defense'
   });
 
-  // Map history to data points
-  teamPlayers.forEach(tp => {
-    const position = positionMap[tp.id] || 'unknown';
-    const isOffense = position === 'offense'; // Assume 'offense' and 'defense' as positions
+  // Process the team players to map history to data points
+  // We'll use the current user's Elo values to determine if a history point is offense or defense
+  // by comparing the Elo values with the current ones
+  for (const tp of teamPlayers) {
+    // Get the current player data for this match
+    const { data: matchTeamPlayers, error: matchTeamPlayersError } = await supabase
+      .from('TeamPlayer')
+      .select('user_id, team_id, old_elo, new_elo')
+      .eq('id', tp.id);
+
+    if (matchTeamPlayersError || !matchTeamPlayers || matchTeamPlayers.length === 0) {
+      console.error('Error fetching match team players:', matchTeamPlayersError);
+      continue;
+    }
+
+    // For each history point, determine if it's offense or defense based on the new Elo value
+    // Comparison against the current offense/defense values
+    const isCloserToOffense = Math.abs(user.elo_offense - tp.new_elo) <= Math.abs(user.elo_defense - tp.new_elo);
 
     const dataPoint = {
       x: tp.created_at,
       y: tp.new_elo,
       id: tp.id,
-      type: isOffense ? 'offense' : 'defense'
+      type: isCloserToOffense ? 'offense' : 'defense'
     };
 
-    if (isOffense) {
+    if (isCloserToOffense) {
       offenseData.push(dataPoint);
     } else {
       defenseData.push(dataPoint);
     }
-  });
+  }
 
   // Add current Elo as last point
   const now = new Date().toISOString();

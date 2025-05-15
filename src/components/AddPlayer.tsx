@@ -1,92 +1,88 @@
 import {useCallback, useState} from 'react';
-import { Box, Button, FormControl, FormLabel, Input, VStack, useToast, Heading, Text, FormErrorMessage, InputGroup, InputLeftElement, Icon, Flex, Alert, AlertIcon } from '@chakra-ui/react';
+import { Box, Button, FormControl, FormLabel, Input, VStack, useToast, Heading, Text, FormErrorMessage, InputGroup, InputLeftElement, Icon, Flex, Alert, AlertIcon, AlertDescription, NumberInput, NumberInputField, NumberInputStepper, NumberIncrementStepper, NumberDecrementStepper } from '@chakra-ui/react';
 import { supabase } from '../lib/supabase';
 
 export const AddPlayer = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: ""
+  });
+  const [nameError, setNameError] = useState("");
   const toast = useToast();
 
-  const isNameInvalid = name.trim().length < 2;
-  const isEmailInvalid = email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
-  const resetForm = () => {
-    setName('');
-    setEmail('');
-    setError(null);
+    // Clear name error when typing
+    if (name === "name" && nameError) {
+      setNameError("");
+    }
   };
 
-  const handleAddPlayer = useCallback(async () => {
-    if (isNameInvalid) {
-      setError('Name must be at least 2 characters long');
-      return;
-    }
-
-    if (isEmailInvalid) {
-      setError('Please enter a valid email address or leave it empty');
-      return;
-    }
-
-    setLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
     setSuccess(false);
 
+    // Validate name
+    if (!formData.name.trim()) {
+      setNameError("Name is required");
+      return;
+    }
+
     try {
-      // Prepare the player data
-      const playerData: any = { 
-        name,
-        offense_elo: 1500, // Default offense ELO score
-        defense_elo: 1500, // Default defense ELO score
-        played: 0,
-        wins: 0,
-        losses: 0,
-        goals: 0,
-        conceded: 0
-      };
+      setLoading(true);
 
-      // Add email if provided
-      if (email.trim() !== '') {
-        playerData.email = email;
-      }
+      // Insert new player into the database
+      const { data, error: insertError } = await supabase
+        .from("User")
+        .insert({
+          name: formData.name.trim(),
+          email: formData.email.trim() || null,
+          elo_offense: 1400, // Default offense ELO score
+          elo_defense: 1400, // Default defense ELO score
+          played: 0,
+          wins: 0,
+          losses: 0,
+          goals: 0,
+          conceded: 0
+        });
 
-      const { data, error: supabaseError } = await supabase
-        .from('User')
-        .insert([playerData])
-        .select();
-
-      if (supabaseError) {
-        throw supabaseError;
+      if (insertError) {
+        throw new Error(insertError.message);
       }
 
       // Show success message
       setSuccess(true);
       toast({
-        title: 'Player added',
-        description: `Player ${name} added successfully!`,
-        status: 'success',
+        title: "Player added",
+        description: `${formData.name} has been added successfully`,
+        status: "success",
         duration: 5000,
         isClosable: true,
       });
 
       // Reset form
-      resetForm();
-    } catch (err: any) {
-      console.error('Error adding player:', err);
-      setError(err.message || 'Failed to add player');
-      toast({
-        title: 'Error adding player',
-        description: err.message || 'Failed to add player',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+      setFormData({
+        name: "",
+        email: ""
       });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      console.error("Error adding player:", errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [name, email, isNameInvalid, isEmailInvalid, toast]);
+  };
 
   return (
     <Box maxWidth="500px" mx="auto" mt={10} p={6} borderRadius="lg" boxShadow="md" bg="white">
@@ -107,7 +103,7 @@ export const AddPlayer = () => {
       )}
       
       <VStack spacing={4} align="stretch">
-        <FormControl isRequired isInvalid={name.trim() !== '' && isNameInvalid}>
+        <FormControl isRequired isInvalid={nameError !== ""}>
           <FormLabel>Player Name</FormLabel>
           <InputGroup>
             <InputLeftElement pointerEvents="none">
@@ -115,14 +111,15 @@ export const AddPlayer = () => {
             </InputLeftElement>
             <Input
               placeholder="Enter player's name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
             />
           </InputGroup>
-          <FormErrorMessage>Name must be at least 2 characters.</FormErrorMessage>
+          <FormErrorMessage>{nameError}</FormErrorMessage>
         </FormControl>
         
-        <FormControl isInvalid={email.trim() !== '' && isEmailInvalid}>
+        <FormControl isInvalid={formData.email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)}>
           <FormLabel>Email (optional)</FormLabel>
           <InputGroup>
             <InputLeftElement pointerEvents="none">
@@ -130,8 +127,9 @@ export const AddPlayer = () => {
             </InputLeftElement>
             <Input
               placeholder="Enter player's email (optional)"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
               type="email"
             />
           </InputGroup>
@@ -141,17 +139,17 @@ export const AddPlayer = () => {
         <Flex justify="space-between" mt={2}>
           <Button
             variant="outline"
-            onClick={resetForm}
-            isDisabled={loading || (!name && !email)}
+            onClick={() => setFormData({ name: "", email: "" })}
+            isDisabled={loading || (!formData.name && !formData.email)}
           >
             Reset
           </Button>
           
           <Button
             colorScheme="blue"
-            onClick={handleAddPlayer}
+            onClick={handleSubmit}
             isLoading={loading}
-            isDisabled={loading || !name || (name.trim() !== '' && isNameInvalid) || isEmailInvalid}
+            isDisabled={loading || !formData.name || (formData.email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))}
           >
             Add Player
           </Button>

@@ -29,19 +29,19 @@ import {
 import { getUsers } from "../lib/supabase";
 import type { User } from "../lib/supabase";
 
-// Calculate win probability using ELO formula
+// Calculate the win probability based on team ratings (ELO)
 const calculateWinProbability = (team1Rating: number, team2Rating: number): number => {
   return 1 / (1 + Math.pow(10, (team2Rating - team1Rating) / 400));
 };
 
-// Calculate team strength with weighted offense/defense ELO
+// Calculate combined team strength using position-specific ELO
 const calculateTeamStrength = (
   defenseElo: number, 
   offenseElo: number, 
   offenseWeight: number = 0.6
 ): number => {
   const defenseWeight = 1 - offenseWeight;
-  return Math.round((offenseElo * offenseWeight) + (defenseElo * defenseWeight));
+  return (offenseElo * offenseWeight) + (defenseElo * defenseWeight);
 };
 
 export const MatchOdds = () => {
@@ -49,18 +49,17 @@ export const MatchOdds = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState({
-    team1Defense: "",
-    team1Offense: "",
-    team2Defense: "",
-    team2Offense: ""
+    team1Defense: '',
+    team1Offense: '',
+    team2Defense: '',
+    team2Offense: ''
   });
-
   const [matchPrediction, setMatchPrediction] = useState({
     team1Probability: 50,
     team2Probability: 50,
-    team1Rating: 0,
-    team2Rating: 0,
-    predictedScore: { team1: 0, team2: 0 }
+    team1Rating: 1500,
+    team2Rating: 1500,
+    predictedScore: { team1: 5, team2: 5 }
   });
 
   useEffect(() => {
@@ -70,7 +69,7 @@ export const MatchOdds = () => {
         setUsers(fetchedUsers);
       } catch (error) {
         console.error("Error loading users:", error);
-        setError("Failed to load players. Please try again later.");
+        setError("Could not load users from database");
       } finally {
         setLoading(false);
       }
@@ -79,30 +78,24 @@ export const MatchOdds = () => {
     loadUsers();
   }, []);
 
+  // Calculate match prediction when players are selected
   useEffect(() => {
-    // Calculate match odds when player selection changes
-    if (
-      selectedPlayers.team1Defense && 
-      selectedPlayers.team1Offense && 
-      selectedPlayers.team2Defense && 
-      selectedPlayers.team2Offense
-    ) {
-      const team1DefenseId = parseInt(selectedPlayers.team1Defense);
-      const team1OffenseId = parseInt(selectedPlayers.team1Offense);
-      const team2DefenseId = parseInt(selectedPlayers.team2Defense);
-      const team2OffenseId = parseInt(selectedPlayers.team2Offense);
-
-      // Find the selected players in the users array
-      const team1DefensePlayer = users.find(user => user.id === team1DefenseId);
-      const team1OffensePlayer = users.find(user => user.id === team1OffenseId);
-      const team2DefensePlayer = users.find(user => user.id === team2DefenseId);
-      const team2OffensePlayer = users.find(user => user.id === team2OffenseId);
-
-      // Get ELO ratings (default to 1500 if not found)
-      const team1DefenseElo = team1DefensePlayer?.defense_elo || 1500;
-      const team1OffenseElo = team1OffensePlayer?.offense_elo || 1500;
-      const team2DefenseElo = team2DefensePlayer?.defense_elo || 1500;
-      const team2OffenseElo = team2OffensePlayer?.offense_elo || 1500;
+    if (selectedPlayers.team1Defense && 
+        selectedPlayers.team1Offense && 
+        selectedPlayers.team2Defense && 
+        selectedPlayers.team2Offense) {
+      
+      // Get player objects
+      const team1DefensePlayer = users.find(u => u.id.toString() === selectedPlayers.team1Defense);
+      const team1OffensePlayer = users.find(u => u.id.toString() === selectedPlayers.team1Offense);
+      const team2DefensePlayer = users.find(u => u.id.toString() === selectedPlayers.team2Defense);
+      const team2OffensePlayer = users.find(u => u.id.toString() === selectedPlayers.team2Offense);
+      
+      // Get ELO ratings, defaulting to 1500 if not available
+      const team1DefenseElo = team1DefensePlayer?.elo_defense || 1500;
+      const team1OffenseElo = team1OffensePlayer?.elo_offense || 1500;
+      const team2DefenseElo = team2DefensePlayer?.elo_defense || 1500;
+      const team2OffenseElo = team2OffensePlayer?.elo_offense || 1500;
 
       // Calculate team ratings with position-specific ELO weighting
       const team1Rating = calculateTeamStrength(team1DefenseElo, team1OffenseElo);
@@ -158,8 +151,8 @@ export const MatchOdds = () => {
 
     return {
       name: player.name,
-      offenseElo: player.offense_elo || 1500,
-      defenseElo: player.defense_elo || 1500,
+      offenseElo: player.elo_offense || 1500,
+      defenseElo: player.elo_defense || 1500,
       wins: player.wins || 0,
       losses: player.losses || 0,
       played: player.played || 0,
@@ -200,7 +193,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team1Defense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (DEF: {user.defense_elo || 1500})
+                        {user.name} (DEF: {user.elo_defense || 1500})
                       </option>
                     ))}
                   </Select>
@@ -216,7 +209,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team1Offense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (OFF: {user.offense_elo || 1500})
+                        {user.name} (OFF: {user.elo_offense || 1500})
                       </option>
                     ))}
                   </Select>
@@ -236,7 +229,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team2Defense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (DEF: {user.defense_elo || 1500})
+                        {user.name} (DEF: {user.elo_defense || 1500})
                       </option>
                     ))}
                   </Select>
@@ -252,7 +245,7 @@ export const MatchOdds = () => {
                   >
                     {users.map(user => (
                       <option key={`team2Offense-${user.id}`} value={user.id.toString()}>
-                        {user.name} (OFF: {user.offense_elo || 1500})
+                        {user.name} (OFF: {user.elo_offense || 1500})
                       </option>
                     ))}
                   </Select>
@@ -309,62 +302,62 @@ export const MatchOdds = () => {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                   <Box>
                     <Text fontWeight="bold" mb={2}>Team 1 (Average ELO: {matchPrediction.team1Rating})</Text>
-                    <Table size="sm" variant="simple">
+                    <Table variant="simple" size="sm" mt={4}>
                       <Thead>
                         <Tr>
                           <Th>Player</Th>
-                          <Th isNumeric>Position</Th>
-                          <Th isNumeric>ELO</Th>
+                          <Th isNumeric>Rating</Th>
+                          <Th isNumeric>Role</Th>
+                          <Th isNumeric>Games</Th>
                           <Th isNumeric>Win %</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
-                        {[selectedPlayers.team1Defense, selectedPlayers.team1Offense].map((playerId, idx) => {
-                          const playerStats = getPlayerStats(playerId);
-                          if (!playerStats) return null;
-                          
-                          const isDefense = idx === 0;
-                          
-                          return (
-                            <Tr key={`team1-player-${idx}`}>
-                              <Td>{playerStats.name}</Td>
-                              <Td isNumeric>{isDefense ? 'Defense' : 'Offense'}</Td>
-                              <Td isNumeric>{isDefense ? playerStats.defenseElo : playerStats.offenseElo}</Td>
-                              <Td isNumeric>{playerStats.winRate}%</Td>
-                            </Tr>
-                          );
-                        })}
+                        <Tr>
+                          <Td>{getPlayerName(selectedPlayers.team1Defense)}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Defense)?.defenseElo}</Td>
+                          <Td isNumeric>Defense</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Defense)?.played}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Defense)?.winRate}%</Td>
+                        </Tr>
+                        <Tr>
+                          <Td>{getPlayerName(selectedPlayers.team1Offense)}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Offense)?.offenseElo}</Td>
+                          <Td isNumeric>Offense</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Offense)?.played}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team1Offense)?.winRate}%</Td>
+                        </Tr>
                       </Tbody>
                     </Table>
                   </Box>
                   
                   <Box>
                     <Text fontWeight="bold" mb={2}>Team 2 (Average ELO: {matchPrediction.team2Rating})</Text>
-                    <Table size="sm" variant="simple">
+                    <Table variant="simple" size="sm" mt={4}>
                       <Thead>
                         <Tr>
                           <Th>Player</Th>
-                          <Th isNumeric>Position</Th>
-                          <Th isNumeric>ELO</Th>
+                          <Th isNumeric>Rating</Th>
+                          <Th isNumeric>Role</Th>
+                          <Th isNumeric>Games</Th>
                           <Th isNumeric>Win %</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
-                        {[selectedPlayers.team2Defense, selectedPlayers.team2Offense].map((playerId, idx) => {
-                          const playerStats = getPlayerStats(playerId);
-                          if (!playerStats) return null;
-                          
-                          const isDefense = idx === 0;
-                          
-                          return (
-                            <Tr key={`team2-player-${idx}`}>
-                              <Td>{playerStats.name}</Td>
-                              <Td isNumeric>{isDefense ? 'Defense' : 'Offense'}</Td>
-                              <Td isNumeric>{isDefense ? playerStats.defenseElo : playerStats.offenseElo}</Td>
-                              <Td isNumeric>{playerStats.winRate}%</Td>
-                            </Tr>
-                          );
-                        })}
+                        <Tr>
+                          <Td>{getPlayerName(selectedPlayers.team2Defense)}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Defense)?.defenseElo}</Td>
+                          <Td isNumeric>Defense</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Defense)?.played}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Defense)?.winRate}%</Td>
+                        </Tr>
+                        <Tr>
+                          <Td>{getPlayerName(selectedPlayers.team2Offense)}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Offense)?.offenseElo}</Td>
+                          <Td isNumeric>Offense</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Offense)?.played}</Td>
+                          <Td isNumeric>{getPlayerStats(selectedPlayers.team2Offense)?.winRate}%</Td>
+                        </Tr>
                       </Tbody>
                     </Table>
                   </Box>

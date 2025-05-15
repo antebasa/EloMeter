@@ -26,85 +26,55 @@ import {
 import { getUsers } from "../lib/supabase";
 import type { User } from "../lib/supabase";
 
-// Enhanced player type with additional skills
+// Extended player interface with skill ratings
 interface PlayerWithSkills extends User {
   defenseSkill: number;
   offenseSkill: number;
 }
 
-// Function to generate balanced teams
+// Generate the best team combinations for balanced gameplay
 const generateBalancedTeams = (selectedPlayers: PlayerWithSkills[]) => {
-  if (selectedPlayers.length < 4) return null;
-
-  const calculateTeamRating = (players: PlayerWithSkills[]) => {
-    // Calculate weighted average of offense and defense skills
-    const team = {
-      defense: players[0],
-      offense: players[1]
-    };
-    
-    // Use the defense_elo for the defender and offense_elo for the attacker
-    const defenderElo = team.defense.defense_elo || 1500;
-    const attackerElo = team.offense.offense_elo || 1500;
-    
-    // Weight the offense ELO more (60%) than defense (40%)
-    const offenseWeight = 0.6;
-    const defenseWeight = 0.4;
-    
-    return (attackerElo * offenseWeight) + (defenderElo * defenseWeight);
-  };
-
-  // Try all possible combinations of 2 teams of 2 players each
-  let bestCombination: {
-    team1: PlayerWithSkills[];
-    team2: PlayerWithSkills[];
-    team1Rating: number;
-    team2Rating: number;
-    difference: number;
-    team1Roles?: {
-      defense: PlayerWithSkills;
-      offense: PlayerWithSkills;
-    };
-    team2Roles?: {
-      defense: PlayerWithSkills;
-      offense: PlayerWithSkills;
-    };
-  } | null = null;
-  let smallestDifference = Infinity;
-
-  // We know we have 4 players, find the most balanced teams
-  for (let i = 0; i < selectedPlayers.length - 1; i++) {
-    for (let j = i + 1; j < selectedPlayers.length; j++) {
-      // Create two teams
-      const team1 = [selectedPlayers[i], selectedPlayers[j]];
-      const team2 = selectedPlayers.filter((_, index) => index !== i && index !== j);
-
-      // Calculate team ratings
-      const team1Rating = calculateTeamRating(team1);
-      const team2Rating = calculateTeamRating(team2);
-
-      // Calculate the difference in ratings
-      const difference = Math.abs(team1Rating - team2Rating);
-
-      // Update best combination if this one is more balanced
-      if (difference < smallestDifference) {
-        smallestDifference = difference;
-        bestCombination = {
-          team1,
-          team2,
-          team1Rating,
-          team2Rating,
-          difference
-        };
-      }
-    }
+  if (selectedPlayers.length !== 4) {
+    return null;
   }
 
-  // Optimize roles based on offense/defense skills
-  if (bestCombination) {
-    // For each team, assign the player with higher defense skill to defense
-    bestCombination.team1Roles = assignRoles(bestCombination.team1);
-    bestCombination.team2Roles = assignRoles(bestCombination.team2);
+  // Calculate team rating using player skills
+  const calculateTeamRating = (players: PlayerWithSkills[]) => {
+    const team = assignRoles(players);
+    return (team.defense.defenseSkill * 4 + team.offense.offenseSkill * 6) / 10;
+  };
+
+  // All possible team combinations (6 possible combinations with 4 players)
+  const combinations = [
+    [0, 1, 2, 3], // team 1: players 0,1; team 2: players 2,3
+    [0, 2, 1, 3], // team 1: players 0,2; team 2: players 1,3
+    [0, 3, 1, 2], // team 1: players 0,3; team 2: players 1,2
+  ];
+
+  let bestCombination = null;
+  let smallestRatingDifference = Infinity;
+
+  // Find the most balanced team combination
+  for (const [p1, p2, p3, p4] of combinations) {
+    const team1 = [selectedPlayers[p1], selectedPlayers[p2]];
+    const team2 = [selectedPlayers[p3], selectedPlayers[p4]];
+
+    const team1Rating = calculateTeamRating(team1);
+    const team2Rating = calculateTeamRating(team2);
+    const ratingDifference = Math.abs(team1Rating - team2Rating);
+
+    if (ratingDifference < smallestRatingDifference) {
+      smallestRatingDifference = ratingDifference;
+      bestCombination = {
+        team1: team1,
+        team2: team2,
+        team1Roles: assignRoles(team1),
+        team2Roles: assignRoles(team2),
+        team1Rating: team1Rating,
+        team2Rating: team2Rating,
+        ratingDifference: ratingDifference
+      };
+    }
   }
 
   return bestCombination;
@@ -117,8 +87,8 @@ const calculatePlayerSkills = (player: User): PlayerWithSkills => {
   const experienceFactor = Math.min(gamesPlayed / 10, 1); // Max experience factor is 1
 
   // Use the actual ELO values directly
-  const defenseElo = player.defense_elo || 1500;
-  const offenseElo = player.offense_elo || 1500;
+  const defenseElo = player.elo_defense || 1400;
+  const offenseElo = player.elo_offense || 1400;
   
   // Scale ELO to 1-10 skill range
   // Assuming 1300-1700 as the typical ELO range, map to 1-10
@@ -150,6 +120,15 @@ const assignRoles = (team: PlayerWithSkills[]) => {
       offense: team[0]
     };
   }
+};
+
+// Calculate team strength using a combination of offense and defense ELO ratings
+const calculateTeamStrength = (defenderElo: number, attackerElo: number): number => {
+  // You can adjust these weights based on importance of offense vs defense
+  const defenseWeight = 0.4;
+  const offenseWeight = 0.6;
+  
+  return Math.round((defenderElo * defenseWeight) + (attackerElo * offenseWeight));
 };
 
 export const OptimalTeams = () => {
@@ -231,8 +210,8 @@ export const OptimalTeams = () => {
                   >
                     <HStack>
                       <Text>{player.name}</Text>
-                      <Badge colorScheme="green" mr={1}>O: {player.offense_elo || 1500}</Badge>
-                      <Badge colorScheme="blue">D: {player.defense_elo || 1500}</Badge>
+                      <Badge colorScheme="green" mr={1}>O: {player.elo_offense || 1400}</Badge>
+                      <Badge colorScheme="blue">D: {player.elo_defense || 1400}</Badge>
                     </HStack>
                   </Checkbox>
                 ))}
@@ -291,8 +270,8 @@ export const OptimalTeams = () => {
                     </VStack>
                   </CardBody>
                 </Card>
-                
-                <Card variant="filled" bg="rgba(245, 240, 225, 0.5)" borderColor="gray.200" borderWidth="1px">
+              
+                <Card variant="filled" bg="orange.50">
                   <CardHeader pb={0}>
                     <Heading size="md" textAlign="center">Team 2</Heading>
                   </CardHeader>
@@ -320,18 +299,25 @@ export const OptimalTeams = () => {
                         </Flex>
                       </Box>
                       
-                      <Stat mt={2} p={2} bg="blue.100" borderRadius="md">
+                      <Stat mt={2} p={2} bg="orange.100" borderRadius="md">
                         <StatLabel>Team Rating</StatLabel>
                         <StatNumber>{Math.round(optimalTeams.team2Rating)}</StatNumber>
-                        <StatHelpText>
-                          {optimalTeams.difference < 50 ? 'Very Balanced' : 
-                            optimalTeams.difference < 100 ? 'Balanced' : 'Imbalanced'}
-                        </StatHelpText>
                       </Stat>
                     </VStack>
                   </CardBody>
                 </Card>
               </SimpleGrid>
+              
+              <Box textAlign="center" mt={6} py={4} bg="gray.50" borderRadius="md">
+                <Text fontWeight="bold">Rating Difference: {optimalTeams.ratingDifference.toFixed(2)}</Text>
+                <Text fontSize="sm" color="gray.600">
+                  {optimalTeams.ratingDifference < 1
+                    ? "These teams are very evenly matched!"
+                    : optimalTeams.ratingDifference < 2
+                    ? "These teams are well balanced."
+                    : "This is the most balanced combination possible with these players."}
+                </Text>
+              </Box>
             </Box>
           )}
         </>
