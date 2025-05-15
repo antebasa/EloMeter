@@ -162,7 +162,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       .from('Team')
       .insert({
         match_id: matchId,
-        color: TeamColor.BLUE,
+        color: TeamColor.WHITE,
         created_at: new Date()
       })
       .select('id')
@@ -178,7 +178,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       .from('Team')
       .insert({
         match_id: matchId,
-        color: TeamColor.WHITE,
+        color: TeamColor.BLUE,
         created_at: new Date()
       })
       .select('id')
@@ -297,118 +297,151 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
 // Function to get a player's match history
 export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
   // First get all the teams the player was part of
-  const { data: teamPlayers, error: teamPlayersError } = await supabase
+  const { data: playerTeamPlayerEntries, error: playerTeamPlayersError } = await supabase
     .from('TeamPlayer')
     .select('id, team_id, old_elo, new_elo, scored, conceded, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  if (teamPlayersError || !teamPlayers) {
-    console.error('Error fetching team players:', teamPlayersError);
+  if (playerTeamPlayersError || !playerTeamPlayerEntries) {
+    console.error('Error fetching team players for user:', playerTeamPlayersError);
     return [];
   }
 
-  // If there are no matches, return empty array
-  if (teamPlayers.length === 0) {
+  if (playerTeamPlayerEntries.length === 0) {
     return [];
   }
 
-  // Get the teams
-  const teamIds = teamPlayers.map(tp => tp.team_id);
-  const { data: teams, error: teamsError } = await supabase
+  // Get the teams the player was on
+  const playerTeamIds = playerTeamPlayerEntries.map(tp => tp.team_id);
+  const { data: playerTeams, error: playerTeamsError } = await supabase
     .from('Team')
     .select('id, match_id, color')
-    .in('id', teamIds);
+    .in('id', playerTeamIds);
 
-  if (teamsError || !teams) {
-    console.error('Error fetching teams:', teamsError);
+  if (playerTeamsError || !playerTeams) {
+    console.error('Error fetching player teams:', playerTeamsError);
     return [];
   }
-
-  // Create a lookup for teams
-  const teamMap = teams.reduce((acc, team) => {
+  const playerTeamMap = playerTeams.reduce((acc, team) => {
     acc[team.id] = team;
     return acc;
   }, {} as Record<number, any>);
 
-  // Get the matches
-  const matchIds = teams.map(team => team.match_id);
+  // Get the matches the player participated in
+  const playerMatchIds = playerTeams.map(team => team.match_id);
   const { data: matches, error: matchesError } = await supabase
     .from('Match')
     .select('id, team_white_score, team_blue_score, created_at')
-    .in('id', matchIds);
+    .in('id', playerMatchIds);
 
   if (matchesError || !matches) {
     console.error('Error fetching matches:', matchesError);
     return [];
   }
-
-  // Create a lookup for matches
   const matchMap = matches.reduce((acc, match) => {
     acc[match.id] = match;
     return acc;
   }, {} as Record<number, any>);
 
-  // Get all team players for the matches to find teammates and opponents
-  const { data: allTeamPlayers, error: allTeamPlayersError } = await supabase
+  // Get all Team entries for these matches
+  const allMatchIds = matches.map(m => m.id);
+  const { data: allTeamsInMatches, error: allTeamsError } = await supabase
+    .from('Team')
+    .select('id, match_id, color')
+    .in('match_id', allMatchIds);
+
+  if (allTeamsError || !allTeamsInMatches) {
+    console.error('Error fetching all teams in matches:', allTeamsError);
+    return [];
+  }
+  const allTeamMap = allTeamsInMatches.reduce((acc, team) => {
+    acc[team.id] = team;
+    return acc;
+  }, {} as Record<number, any>);
+
+  // Get all TeamPlayer entries for all teams in these matches
+  const allTeamIdsInMatches = allTeamsInMatches.map(t => t.id);
+  const { data: allTeamPlayersInMatches, error: allTeamPlayersInMatchesError } = await supabase
     .from('TeamPlayer')
     .select('id, team_id, user_id')
-    .in('team_id', teamIds);
+    .in('team_id', allTeamIdsInMatches);
 
-  if (allTeamPlayersError || !allTeamPlayers) {
-    console.error('Error fetching all team players:', allTeamPlayersError);
+  if (allTeamPlayersInMatchesError || !allTeamPlayersInMatches) {
+    console.error('Error fetching all team players in matches:', allTeamPlayersInMatchesError);
     return [];
   }
 
-  // Get all users
-  const userIds = allTeamPlayers.map(tp => tp.user_id);
+  // Get all users involved in these matches
+  const allUserIdsInMatches = allTeamPlayersInMatches.map(tp => tp.user_id);
+  // Deduplicate user IDs before fetching
+  const uniqueUserIds = [...new Set(allUserIdsInMatches)];
   const { data: users, error: usersError } = await supabase
     .from('User')
     .select('id, name')
-    .in('id', userIds);
+    .in('id', uniqueUserIds);
 
   if (usersError || !users) {
     console.error('Error fetching users:', usersError);
     return [];
   }
-
-  // Create a lookup for users
   const userMap = users.reduce((acc, user) => {
     acc[user.id] = user;
     return acc;
   }, {} as Record<number, any>);
 
-  // Map team players to match history with detailed information
-  return teamPlayers.map(tp => {
-    const team = teamMap[tp.team_id];
-    const match = matchMap[team.match_id];
+  // Map player's team player entries to match history with detailed information
+  return playerTeamPlayerEntries.map(tp => {
+    const playerSpecificTeam = playerTeamMap[tp.team_id]; // This is the team the current player was on for this specific TeamPlayer entry
+    if (!playerSpecificTeam) {
+        console.warn(`Could not find team with id ${tp.team_id} in playerTeamMap for TeamPlayer entry ${tp.id}`);
+        return null; // Or some default error object
+    }
+    const match = matchMap[playerSpecificTeam.match_id];
+    if (!match) {
+        console.warn(`Could not find match with id ${playerSpecificTeam.match_id} in matchMap for TeamPlayer entry ${tp.id}`);
+        return null;
+    }
 
-    // Determine teammates and opponents
-    const teamPlayers = allTeamPlayers.filter(player => player.team_id === tp.team_id);
-    const teammatePlayer = teamPlayers.find(player => player.user_id !== userId);
-    const teammate = teammatePlayer ? userMap[teammatePlayer.user_id] : null;
+    // Determine teammates
+    const currentPlayerTeamPlayers = allTeamPlayersInMatches.filter(p => p.team_id === playerSpecificTeam.id);
+    const teammatePlayerEntry = currentPlayerTeamPlayers.find(p => p.user_id !== userId);
+    const teammate = teammatePlayerEntry ? userMap[teammatePlayerEntry.user_id] : null;
 
-    const opposingTeamPlayers = allTeamPlayers.filter(player =>
-      player.team_id !== tp.team_id && teamMap[player.team_id]?.match_id === team.match_id
-    );
+    // Determine opponents
+    const opposingTeamPlayers = allTeamPlayersInMatches.filter(p => {
+      const pTeam = allTeamMap[p.team_id];
+      return pTeam && pTeam.match_id === match.id && pTeam.id !== playerSpecificTeam.id;
+    });
+    
+    const opponentUsers = opposingTeamPlayers.map(p => userMap[p.user_id]).filter(u => u); // Filter out undefined users
+    // Deduplicate opponent users based on id to avoid listing same opponent twice if they are on offense and defense of same team (not typical for this schema but good practice)
+    const uniqueOpponents = Array.from(new Set(opponentUsers.map(u => u.id)))
+                               .map(id => opponentUsers.find(u => u.id === id)); 
 
-    const opponents = opposingTeamPlayers.map(player => userMap[player.user_id]);
-
-    // Determine match outcome
-    const isTeamBlue = team.color === TeamColor.BLUE;
-    const teamScore = isTeamBlue ? match.team_blue_score : match.team_white_score;
-    const opponentScore = isTeamBlue ? match.team_white_score : match.team_blue_score;
+    // Determine match outcome for the selected player's team
+    const isPlayerTeamBlue = playerSpecificTeam.color === TeamColor.BLUE;
+    const teamScore = isPlayerTeamBlue ? match.team_blue_score : match.team_white_score;
+    const opponentScore = isPlayerTeamBlue ? match.team_white_score : match.team_blue_score;
     const won = teamScore > opponentScore;
 
-    // Format the score to ensure the winning team always has 10 goals
+    // Format the score string
     let formattedScore;
     if (won) {
-      formattedScore = `10-${opponentScore}`;
+      formattedScore = `${teamScore}-${opponentScore}`;
     } else if (teamScore === opponentScore) {
       formattedScore = `${teamScore}-${opponentScore}`; // Draw
     } else {
-      formattedScore = `${teamScore}-10`;
+      formattedScore = `${teamScore}-${opponentScore}`;
     }
+    // The original formatting logic which forces one score to 10 if not a draw. Re-evaluate if this is desired.
+    // if (won) {
+    //   formattedScore = `10-${opponentScore}`;
+    // } else if (teamScore === opponentScore) {
+    //   formattedScore = `${teamScore}-${opponentScore}`; // Draw
+    // } else {
+    //   formattedScore = `${teamScore}-10`;
+    // }
 
     return {
       id: tp.id,
@@ -418,12 +451,12 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       eloChange: tp.new_elo - tp.old_elo,
       oldElo: tp.old_elo,
       newElo: tp.new_elo,
-      scored: tp.scored,
-      conceded: tp.conceded,
-      teammate: teammate ? teammate.name : 'Unknown',
-      opponents: opponents.length > 0 ? opponents.map(o => o ? o.name : 'Unknown').join(' & ') : 'Unknown Opponents'
+      scored: tp.scored, // This is individual player stats from TeamPlayer table, might not be team score.
+      conceded: tp.conceded, // Same as above.
+      teammate: teammate ? teammate.name : '-', // Use '-' if no teammate (e.g. 1v1, though schema implies 2v2)
+      opponents: uniqueOpponents.length > 0 ? uniqueOpponents.map(o => o ? o.name : 'Unknown').join(' & ') : 'Unknown Opponents'
     };
-  });
+  }).filter(matchHistoryEntry => matchHistoryEntry !== null); // Filter out null entries from map
 }
 
 // Function to get a player's Elo history

@@ -36,12 +36,13 @@ const calculateWinProbability = (team1Rating: number, team2Rating: number): numb
 
 // Calculate combined team strength using position-specific ELO
 const calculateTeamStrength = (
-  defenseElo: number, 
-  offenseElo: number, 
-  offenseWeight: number = 0.6
+  defenseElo: number,
+  offenseElo: number
+  // offenseWeight: number = 0.6 // No longer used
 ): number => {
-  const defenseWeight = 1 - offenseWeight;
-  return (offenseElo * offenseWeight) + (defenseElo * defenseWeight);
+  // const defenseWeight = 1 - offenseWeight; // No longer used
+  // return (offenseElo * offenseWeight) + (defenseElo * defenseWeight); // Old weighted average
+  return (defenseElo + offenseElo) / 2; // Python script uses simple average
 };
 
 export const MatchOdds = () => {
@@ -80,52 +81,52 @@ export const MatchOdds = () => {
 
   // Calculate match prediction when players are selected
   useEffect(() => {
-    if (selectedPlayers.team1Defense && 
-        selectedPlayers.team1Offense && 
-        selectedPlayers.team2Defense && 
+    if (selectedPlayers.team1Defense &&
+        selectedPlayers.team1Offense &&
+        selectedPlayers.team2Defense &&
         selectedPlayers.team2Offense) {
-      
+
       // Get player objects
       const team1DefensePlayer = users.find(u => u.id.toString() === selectedPlayers.team1Defense);
       const team1OffensePlayer = users.find(u => u.id.toString() === selectedPlayers.team1Offense);
       const team2DefensePlayer = users.find(u => u.id.toString() === selectedPlayers.team2Defense);
       const team2OffensePlayer = users.find(u => u.id.toString() === selectedPlayers.team2Offense);
-      
-      // Get ELO ratings, defaulting to 1500 if not available
-      const team1DefenseElo = team1DefensePlayer?.elo_defense || 1500;
-      const team1OffenseElo = team1OffensePlayer?.elo_offense || 1500;
-      const team2DefenseElo = team2DefensePlayer?.elo_defense || 1500;
-      const team2OffenseElo = team2OffensePlayer?.elo_offense || 1500;
 
-      // Calculate team ratings with position-specific ELO weighting
+      // Get ELO ratings, defaulting to 1400 (like python script) if not available
+      const team1DefenseElo = team1DefensePlayer?.elo_defense || 1400;
+      const team1OffenseElo = team1OffensePlayer?.elo_offense || 1400;
+      const team2DefenseElo = team2DefensePlayer?.elo_defense || 1400;
+      const team2OffenseElo = team2OffensePlayer?.elo_offense || 1400;
+
+      // Calculate team ratings
       const team1Rating = calculateTeamStrength(team1DefenseElo, team1OffenseElo);
       const team2Rating = calculateTeamStrength(team2DefenseElo, team2OffenseElo);
 
       // Calculate win probability
-      const team1WinProbability = calculateWinProbability(team1Rating, team2Rating);
-      const team1Percentage = Math.round(team1WinProbability * 100);
+      const team1WinProbabilityDecimal = calculateWinProbability(team1Rating, team2Rating); // This is 0-1
+      const team1Percentage = Math.round(team1WinProbabilityDecimal * 100);
       const team2Percentage = 100 - team1Percentage;
 
-      // Predict score based on win probability
-      // This is a simple model - more games predicted for the team with higher probability
-      const totalGames = 10; // Assuming games go up to 10
-      const spread = Math.abs(team1Percentage - team2Percentage) / 100;
-      let team1Score, team2Score;
+      // Predict score based on Python script's logic
+      let team1Score: number;
+      let team2Score: number;
+      let closeMatchComment = "";
 
-      if (team1Percentage > team2Percentage) {
-        // Team 1 is predicted to win, so they get 10 goals
-        team1Score = 10;
-        // Calculate opponent score based on the probability spread
-        team2Score = Math.max(0, Math.min(9, Math.round(10 * (1 - spread))));
-      } else if (team2Percentage > team1Percentage) {
-        // Team 2 is predicted to win, so they get 10 goals
-        team2Score = 10;
-        // Calculate opponent score based on the probability spread
-        team1Score = Math.max(0, Math.min(9, Math.round(10 * (1 - spread))));
-      } else {
-        // Equal probability means a very close match
+      const team1ExpectedDecimal = team1WinProbabilityDecimal; // Probability for team 1 (0-1)
+      const team2ExpectedDecimal = 1 - team1WinProbabilityDecimal; // Probability for team 2 (0-1)
+
+      if (Math.abs(team1ExpectedDecimal - 0.5) < 0.01) { // Corresponds to 49-51% win prob
         team1Score = 10;
         team2Score = 9;
+        closeMatchComment = " (Close Match)";
+      } else if (team1ExpectedDecimal > team2ExpectedDecimal) {
+        team1Score = 10;
+        const loserScore = Math.round(10 * team2ExpectedDecimal / team1ExpectedDecimal);
+        team2Score = Math.max(0, Math.min(9, loserScore)); // Ensure score is between 0-9 for loser
+      } else {
+        team2Score = 10;
+        const loserScore = Math.round(10 * team1ExpectedDecimal / team2ExpectedDecimal);
+        team1Score = Math.max(0, Math.min(9, loserScore)); // Ensure score is between 0-9 for loser
       }
 
       setMatchPrediction({
@@ -133,7 +134,8 @@ export const MatchOdds = () => {
         team2Probability: team2Percentage,
         team1Rating: Math.round(team1Rating),
         team2Rating: Math.round(team2Rating),
-        predictedScore: { team1: team1Score, team2: team2Score }
+        predictedScore: { team1: team1Score, team2: team2Score },
+        // We might want to display closeMatchComment somewhere in the UI if needed
       });
     }
   }, [selectedPlayers, users]);
