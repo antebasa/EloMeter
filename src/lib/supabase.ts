@@ -483,3 +483,68 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
 
   return [...dedupedOffense, ...dedupedDefense].sort((a,b) => new Date(a.x).getTime() - new Date(b.x).getTime());
 }
+
+export async function getMatchHistoryBetweenTeams(
+  team1Player1Id: number, 
+  team1Player2Id: number, 
+  team2Player1Id: number, 
+  team2Player2Id: number,
+  limit: number = 3
+): Promise<any[]> {
+  try {
+    // Ensure canonical representation for team players (order by ID)
+    const t1p1 = Math.min(team1Player1Id, team1Player2Id);
+    const t1p2 = Math.max(team1Player1Id, team1Player2Id);
+    const t2p1 = Math.min(team2Player1Id, team2Player2Id);
+    const t2p2 = Math.max(team2Player1Id, team2Player2Id);
+
+    // Find Team IDs for both teams
+    const { data: team1Data, error: team1Error } = await supabase
+      .from('Team')
+      .select('id')
+      .eq('user1_id', t1p1)
+      .eq('user2_id', t1p2)
+      .maybeSingle(); // Use maybeSingle as team might not exist
+
+    if (team1Error) throw team1Error;
+    if (!team1Data) return []; // Team 1 not found
+
+    const { data: team2Data, error: team2Error } = await supabase
+      .from('Team')
+      .select('id')
+      .eq('user1_id', t2p1)
+      .eq('user2_id', t2p2)
+      .maybeSingle();
+
+    if (team2Error) throw team2Error;
+    if (!team2Data) return []; // Team 2 not found
+
+    const team1Id = team1Data.id;
+    const team2Id = team2Data.id;
+
+    // Query matches involving these two specific teams
+    const { data: matches, error: matchesError } = await supabase
+      .from('Match')
+      .select('created_at, white_team_id, blue_team_id, team_white_score, team_blue_score')
+      .or(`and(white_team_id.eq.${team1Id},blue_team_id.eq.${team2Id}),and(white_team_id.eq.${team2Id},blue_team_id.eq.${team1Id})`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (matchesError) {
+      console.error('Error fetching match history between teams:', matchesError);
+      throw matchesError;
+    }
+
+    return matches.map(match => ({
+      date: match.created_at,
+      team1Score: match.white_team_id === team1Id ? match.team_white_score : match.team_blue_score,
+      team2Score: match.blue_team_id === team2Id ? match.team_blue_score : match.team_white_score,
+      // To be more precise, let's indicate which actual DB team was white/blue if needed for display
+      // This current structure assumes the perspective of "team1" (t1p1,t1p2) vs "team2" (t2p1,t2p2)
+    }));
+
+  } catch (error) {
+    console.error('Error in getMatchHistoryBetweenTeams:', error);
+    return [];
+  }
+}
