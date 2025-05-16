@@ -64,7 +64,7 @@ const LoginPage: React.FC = () => {
                 </FormControl>
                 <FormControl id="password">
                     <FormLabel color={'white'}>Password</FormLabel>
-                    <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} isDisabled={loading} />
+                    <Input color={'white'} type="password" value={password} onChange={(e) => setPassword(e.target.value)} isDisabled={loading} />
                 </FormControl>
                 {error && <Text color="red.500">{error}</Text>}
                 {message && <Text color="green.500">{message}</Text>}
