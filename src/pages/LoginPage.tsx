@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { Box, Button, FormControl, FormLabel, Input, Heading, VStack, Text, Link as ChakraLink, StackDivider } from '@chakra-ui/react';
+import React, {useState} from 'react';
+import {supabase} from '../supabaseClient';
+import {Box, Button, FormControl, FormLabel, Heading, Input, Link as ChakraLink, Text, VStack} from '@chakra-ui/react';
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
