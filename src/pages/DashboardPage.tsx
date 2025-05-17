@@ -67,12 +67,6 @@ const DashboardPage: React.FC = () => {
 
     return (
         <Box>
-            <VStack alignItems="flex-start" p={4} bg="gray.100" w="full">
-                {user && <Text>Logged in as: {user.email}</Text>}
-                <Button colorScheme="teal" size="sm" onClick={handleSignOut}>
-                    Sign Out
-                </Button>
-            </VStack>
             <Layout
                 activeNavItem={activeNavItem}
                 onNavItemClick={(item) => {

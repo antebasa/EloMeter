@@ -1,5 +1,6 @@
 import type {ReactNode} from 'react';
-import {Box, Divider, Flex, Heading, Text, VStack} from '@chakra-ui/react';
+import {Box, Divider, Flex, Heading, Text, VStack, Spacer, Button} from '@chakra-ui/react';
+import { useAuth } from "../contexts/AuthContext";
 
 // Navigation item type
 interface NavItemProps {
@@ -47,6 +48,7 @@ interface LayoutProps {
 }
 
 export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps) => {
+  const { signOut } = useAuth();
   const navItems = [
     { name: 'EnterScore', label: 'Enter Score' },
     { name: 'MatchOdds', label: 'Match Odds' },
@@ -82,6 +84,17 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
                 {item.label}
               </NavItem>
             ))}
+          </Box>
+          <Spacer />
+          <Box px="4" pb="5" w="full">
+            <Button 
+              colorScheme="teal" 
+              variant="outline" 
+              width="full" 
+              onClick={async () => await signOut()}
+            >
+              Sign Out
+            </Button>
           </Box>
         </VStack>
       </Box>
