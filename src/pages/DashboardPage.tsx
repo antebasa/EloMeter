@@ -13,7 +13,7 @@ import {AddPlayer} from '../components/AddPlayer';
 import type {MatchData} from "../lib/supabase"; // Assuming supabase.ts exports this type
 
 const DashboardPage: React.FC = () => {
-    const { user, signOut } = useAuth();
+    const { user } = useAuth();
     // const navigate = useNavigate(); // Keep if needed
 
     // State and handlers from old App.tsx

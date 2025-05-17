@@ -14,7 +14,7 @@ const PersonalInfo: React.FC = () => {
         if (user) {
             // Check profiles table first, then user_metadata as fallback
             const fetchProfileDisplayName = async () => {
-                const { data: profileData, error: profileError } = await supabase
+                const { data: profileData } = await supabase
                     .from('profiles')
                     .select('display_name')
                     .eq('id', user.id)
