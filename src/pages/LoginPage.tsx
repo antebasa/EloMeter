@@ -37,22 +37,22 @@ const LoginPage: React.FC = () => {
         setLoading(false);
     };
 
-    const handleOAuthSignIn = async (provider: 'slack') => {
-        setLoading(true);
-        setError(null);
-        try {
-            const { error: oauthError } = await supabase.auth.signInWithOAuth({
-                provider,
-                options: {
-                    redirectTo: window.location.origin + '/app' // Or your desired redirect path after login
-                }
-            });
-            if (oauthError) throw oauthError;
-        } catch (e: any) {
-            setError(e.message);
-        }
-        // setLoading(false); // Usually, the page will redirect before this is called
-    };
+    // const handleOAuthSignIn = async (provider: 'slack') => {
+    //     setLoading(true);
+    //     setError(null);
+    //     try {
+    //         const { error: oauthError } = await supabase.auth.signInWithOAuth({
+    //             provider,
+    //             options: {
+    //                 redirectTo: window.location.origin + '/app' // Or your desired redirect path after login
+    //             }
+    //         });
+    //         if (oauthError) throw oauthError;
+    //     } catch (e: any) {
+    //         setError(e.message);
+    //     }
+    //     // setLoading(false); // Usually, the page will redirect before this is called
+    // };
 
     return (
         <Box display="flex" alignItems="center" justifyContent="center" minHeight="100vh">
@@ -77,18 +77,18 @@ const LoginPage: React.FC = () => {
                         {isLogin ? 'Sign Up' : 'Login'}
                     </ChakraLink>
                 </Text>
-                <VStack width="full" paddingTop={4} spacing={4} divider={<StackDivider borderColor="gray.200" />}>
-                    <Button
-                        variant="outline"
-                        width="full"
-                        onClick={() => handleOAuthSignIn('slack')}
-                        isLoading={loading}
-                        isDisabled={loading}
-                        color={'teal.500'}
-                    >
-                        Sign in with Slack
-                    </Button>
-                </VStack>
+                {/*<VStack width="full" paddingTop={4} spacing={4} divider={<StackDivider borderColor="gray.200" />}>*/}
+                {/*    <Button*/}
+                {/*        variant="outline"*/}
+                {/*        width="full"*/}
+                {/*        onClick={() => handleOAuthSignIn('slack')}*/}
+                {/*        isLoading={loading}*/}
+                {/*        isDisabled={loading}*/}
+                {/*        color={'teal.500'}*/}
+                {/*    >*/}
+                {/*        Sign in with Slack*/}
+                {/*    </Button>*/}
+                {/*</VStack>*/}
             </VStack>
         </Box>
     );
