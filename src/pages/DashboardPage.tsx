@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useCallback, useState} from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Box, Button, Heading, Text, VStack } from '@chakra-ui/react';
 // import { useNavigate } from 'react-router-dom'; // Keep if direct navigation is still needed
@@ -35,10 +35,15 @@ const DashboardPage: React.FC = () => {
         setSelectedPlayerIdForHistory(null);
     };
 
-    const renderContent = () => {
+    const renderContent = useCallback(() => {
         switch (activeNavItem) {
             case 'EnterScore':
-                return <EnterScore onSubmit={handleSubmit} />;
+                if (user?.user_metadata?.admin) {
+                    return <EnterScore />;
+                } else {
+                    console.warn("Unauthorized access attempt to EnterScore");
+                    return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
+                }
             case 'MatchOdds':
                 return <MatchOdds />;
             case 'History':
@@ -48,13 +53,24 @@ const DashboardPage: React.FC = () => {
             case 'Players':
                 return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
             case 'AddPlayer':
-                return <AddPlayer />;
-            // case 'ImportMatches':
-            //   return <ImportMatches />;
+                if (user?.user_metadata?.admin) {
+                    return <AddPlayer />;
+                } else {
+                    console.warn("Unauthorized access attempt to AddPlayer");
+                    return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
+                }
             default:
-                return <EnterScore onSubmit={handleSubmit} />;
+                return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
         }
-    };
+    }, [
+        user,
+        activeNavItem,
+        handleSubmit,
+        selectedPlayerIdForHistory,
+        clearSelectedPlayerIdForHistory,
+        handleNavigateToHistoryWithPlayer,
+        handleNavigateToHistoryWithPlayer
+    ]);
 
     const handleSignOut = async () => {
         await signOut();
@@ -73,6 +89,7 @@ const DashboardPage: React.FC = () => {
                     if (item !== 'History') {
                         clearSelectedPlayerIdForHistory();
                     }
+                    console.log("ajmo", item)
                     setActiveNavItem(item);
                 }}
             >

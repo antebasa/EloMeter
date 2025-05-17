@@ -48,16 +48,21 @@ interface LayoutProps {
 }
 
 export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps) => {
-  const { signOut } = useAuth();
-  const navItems = [
-    { name: 'EnterScore', label: 'Enter Score' },
+  const { user, signOut } = useAuth();
+  let navItems = []
+  if (user?.user_metadata?.admin) {
+    navItems.push({ name: 'EnterScore', label: 'Enter Score' },)
+  }
+  navItems = [...navItems,
     { name: 'MatchOdds', label: 'Match Odds' },
     { name: 'History', label: 'History' },
     { name: 'OptimalTeams', label: 'Optimal Teams' },
     { name: 'Players', label: 'Players' },
-    { name: 'AddPlayer', label: 'Add Player' },
-    { name: 'ImportMatches', label: 'Import Matches' }
   ];
+
+  if (user?.user_metadata?.admin) {
+    navItems.push({ name: 'AddPlayer', label: 'Add Player' },)
+  }
 
   return (
     <Flex h="100vh" w="100%">
@@ -87,10 +92,10 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
           </Box>
           <Spacer />
           <Box px="4" pb="5" w="full">
-            <Button 
-              colorScheme="teal" 
-              variant="outline" 
-              width="full" 
+            <Button
+              colorScheme="teal"
+              variant="outline"
+              width="full"
               onClick={async () => await signOut()}
             >
               Sign Out

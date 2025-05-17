@@ -60,7 +60,7 @@ const LoginPage: React.FC = () => {
                 <Heading color={'white'}>{isLogin ? 'Login' : 'Sign Up'}</Heading>
                 <FormControl id="email">
                     <FormLabel color={'white'}>Email address</FormLabel>
-                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} isDisabled={loading} />
+                    <Input color={'white'} type="email" value={email} onChange={(e) => setEmail(e.target.value)} isDisabled={loading} />
                 </FormControl>
                 <FormControl id="password">
                     <FormLabel color={'white'}>Password</FormLabel>
