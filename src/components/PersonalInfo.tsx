@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
-import { Box, Button, FormControl, FormLabel, Input, VStack, Heading, Text, useToast, Spinner } from '@chakra-ui/react';
+import React, {useEffect, useState} from 'react';
+import {supabase} from '../supabaseClient';
+import {useAuth} from '../contexts/AuthContext';
+import {Box, Button, FormControl, FormLabel, Heading, Input, Spinner, Text, useToast, VStack} from '@chakra-ui/react';
 
 const PersonalInfo: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
@@ -45,7 +45,7 @@ const PersonalInfo: React.FC = () => {
                 status: 'error',
                 duration: 5000,
                 isClosable: true,
-                colorScheme: 'red' 
+                colorScheme: 'red'
             });
             return;
         }
@@ -57,7 +57,7 @@ const PersonalInfo: React.FC = () => {
                 status: 'error',
                 duration: 5000,
                 isClosable: true,
-                colorScheme: 'red' 
+                colorScheme: 'red'
             });
             return;
         }
@@ -82,8 +82,8 @@ const PersonalInfo: React.FC = () => {
 
             // Step 2: Update user_metadata as a fallback or for other parts of app that might still use it
             // Best practice is to primarily rely on the 'profiles' table for profile data.
-            const { data: updatedUser, error: userMetadataError } = await supabase.auth.updateUser({
-                data: { display_name: displayName.trim() }, 
+            const {  error: userMetadataError } = await supabase.auth.updateUser({
+                data: { display_name: displayName.trim() },
             });
 
             if (userMetadataError) {
@@ -115,7 +115,7 @@ const PersonalInfo: React.FC = () => {
                 status: 'error',
                 duration: 7000,
                 isClosable: true,
-                colorScheme: 'red' 
+                colorScheme: 'red'
             });
         } finally {
             setLoading(false);
@@ -137,20 +137,20 @@ const PersonalInfo: React.FC = () => {
                 <Heading size="lg" color="white">Personal Information</Heading>
                 <FormControl id="display-name">
                     <FormLabel color="white">Display Name</FormLabel>
-                    <Input 
-                        type="text" 
-                        value={displayName} 
-                        onChange={(e) => setDisplayName(e.target.value)} 
-                        placeholder="Enter your display name" 
+                    <Input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="Enter your display name"
                         color="white" // Text color for input
                         borderColor="gray.600" // Border color for input
                         _hover={{ borderColor: 'gray.500' }}
                         _focus={{ borderColor: 'blue.500', boxShadow: '0 0 0 1px teal.500' }}
                     />
                 </FormControl>
-                <Button 
-                    colorScheme="teal" 
-                    onClick={handleSave} 
+                <Button
+                    colorScheme="teal"
+                    onClick={handleSave}
                     isLoading={loading}
                     isDisabled={loading || !displayName.trim() || displayName.trim() === initialDisplayName}
                 >
@@ -161,4 +161,4 @@ const PersonalInfo: React.FC = () => {
     );
 };
 
-export default PersonalInfo; 
+export default PersonalInfo;

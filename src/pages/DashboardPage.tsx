@@ -1,17 +1,16 @@
 import React, {useCallback, useState} from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { Box, Button, Heading, Text, VStack } from '@chakra-ui/react';
+import {useAuth} from '../contexts/AuthContext';
+import {Box} from '@chakra-ui/react';
 // import { useNavigate } from 'react-router-dom'; // Keep if direct navigation is still needed
-
 // Imports from old App.tsx
-import { Layout } from '../components/Layout';
-import { EnterScore } from '../components/EnterScore';
-import { MatchOdds } from '../components/MatchOdds';
-import { History } from '../components/History';
-import { OptimalTeams } from '../components/OptimalTeams';
-import { Players } from '../components/Players';
-import { AddPlayer } from '../components/AddPlayer';
-import type { MatchData } from "../lib/supabase"; // Assuming supabase.ts exports this type
+import {Layout} from '../components/Layout';
+import {EnterScore} from '../components/EnterScore';
+import {MatchOdds} from '../components/MatchOdds';
+import {History} from '../components/History';
+import {OptimalTeams} from '../components/OptimalTeams';
+import {Players} from '../components/Players';
+import {AddPlayer} from '../components/AddPlayer';
+import type {MatchData} from "../lib/supabase"; // Assuming supabase.ts exports this type
 
 const DashboardPage: React.FC = () => {
     const { user, signOut } = useAuth();
@@ -71,11 +70,6 @@ const DashboardPage: React.FC = () => {
         handleNavigateToHistoryWithPlayer,
         handleNavigateToHistoryWithPlayer
     ]);
-
-    const handleSignOut = async () => {
-        await signOut();
-        // AuthProvider will update session, ProtectedRoute will redirect to /login
-    };
 
     // The user info and sign out button could be part of the Layout component itself,
     // or passed to it, or displayed separately as shown here.
