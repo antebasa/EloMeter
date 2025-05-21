@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {ReactNode, useEffect, useState} from "react";
 import {
   Alert,
   AlertDescription,
@@ -312,7 +312,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               </Portal>
             </Popover>
           );
-        })}
+        }) as ReactNode}
       </HStack>
     );
   };
@@ -398,7 +398,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                       <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>
-                  ))}
+                  )) as ReactNode}
                 </Tbody>
               </Table>
             </Box>
@@ -438,7 +438,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                       <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>
-                  ))}
+                  )) as ReactNode}
                 </Tbody>
               </Table>
             </Box>
@@ -476,7 +476,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                       <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>
-                  ))}
+                  )) as ReactNode}
                 </Tbody>
               </Table>
             </Box>
@@ -485,10 +485,10 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
       </Tabs>
       {filteredPlayers.length === 0 && !loading && searchTerm && (
         <Text mt={4} textAlign="center" color={textColor}>No players found for "{searchTerm}".</Text>
-      )}
+      ) as ReactNode}
       {filteredPlayers.length === 0 && !loading && !searchTerm && (
          <Text mt={4} textAlign="center" color={textColor}>No players available. Add some players and matches to get started!</Text>
-      )}
+      ) as ReactNode}
     </Box>
   );
 };
