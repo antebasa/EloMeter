@@ -323,22 +323,39 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
   const typedPlayerStatsEntries = playerStatsEntries as unknown as PlayerMatchStatsQueryResultEntry[];
   if (typedPlayerStatsEntries.length === 0) return [];
 
-  const allUserIdsInHistory = new Set<number>();
   const allTeamIdsInHistory = new Set<number>();
-
   typedPlayerStatsEntries.forEach(entry => {
-    // entry.team_id is guaranteed by !inner join
-    allUserIdsInHistory.add(entry.team_id.user1_id);
-    allUserIdsInHistory.add(entry.team_id.user2_id);
     allTeamIdsInHistory.add(entry.team_id.id);
-
-    // entry.match_id is guaranteed by !inner join
     allTeamIdsInHistory.add(entry.match_id.white_team_id);
     allTeamIdsInHistory.add(entry.match_id.blue_team_id);
   });
 
-  const uniqueUserIdsArray = [...allUserIdsInHistory];
-  const uniqueTeamIdsArray = [...allTeamIdsInHistory];
+  const uniqueTeamIdsArray = [...allTeamIdsInHistory].filter(id => id != null); // Filter out potential nulls if any team ID could be null
+
+  let teamDetailsMap: Record<number, JoinedTeamDetails> = {};
+  if (uniqueTeamIdsArray.length > 0) {
+    const { data: teams, error: teamsError } = await supabase
+      .from('Team')
+      .select('id, user1_id, user2_id, name')
+      .in('id', uniqueTeamIdsArray);
+    if (teamsError) {
+      console.error('Error fetching teams for history:', teamsError);
+      // Decide if to throw, return partial, or empty. For now, continue and some names might be 'Unknown'.
+    } else if (teams) {
+      teams.forEach(t => teamDetailsMap[t.id] = t as JoinedTeamDetails);
+    }
+  }
+
+  const allUserIdsInHistory = new Set<number>();
+  Object.values(teamDetailsMap).forEach(team => {
+    if (team.user1_id) allUserIdsInHistory.add(team.user1_id);
+    if (team.user2_id) allUserIdsInHistory.add(team.user2_id);
+  });
+  // Also ensure the user whose history is being fetched is included, in case they have no teams (should not happen with PlayerMatchStats)
+  allUserIdsInHistory.add(userId);
+
+
+  const uniqueUserIdsArray = [...allUserIdsInHistory].filter(id => id != null);
 
   let userMap: Record<number, { id: number; name: string }> = {};
   if (uniqueUserIdsArray.length > 0) {
@@ -346,19 +363,14 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       .from('User')
       .select('id, name')
       .in('id', uniqueUserIdsArray);
-    if (usersError) console.error('Error fetching users for history:', usersError);
-    else if (users) users.forEach(u => userMap[u.id] = u as { id: number; name: string });
+    if (usersError) {
+      console.error('Error fetching users for history:', usersError);
+      // Decide if to throw, return partial, or empty. For now, continue and some names might be 'Unknown' or 'Player'.
+    } else if (users) {
+      users.forEach(u => userMap[u.id] = u as { id: number; name: string });
+    }
   }
 
-  let teamDetailsMap: Record<number, JoinedTeamDetails> = {};
-   if (uniqueTeamIdsArray.length > 0) {
-    const { data: teams, error: teamsError } = await supabase
-      .from('Team')
-      .select('id, user1_id, user2_id, name')
-      .in('id', uniqueTeamIdsArray);
-    if (teamsError) console.error('Error fetching teams for history:', teamsError);
-    else if (teams) teams.forEach(t => teamDetailsMap[t.id] = t as JoinedTeamDetails);
-  }
 
   return typedPlayerStatsEntries.map(pms => {
     // With !inner joins, pms.match_id and pms.team_id are guaranteed to exist.
