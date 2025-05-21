@@ -12,6 +12,8 @@ import {
   CheckboxGroup,
   Divider,
   Flex,
+  FormControl,
+  FormLabel,
   Heading,
   HStack,
   SimpleGrid,
@@ -20,6 +22,7 @@ import {
   StatHelpText,
   StatLabel,
   StatNumber,
+  Switch,
   Text,
   useColorModeValue,
   VStack
@@ -79,6 +82,51 @@ const generateBalancedTeams = (selectedPlayers: PlayerWithSkills[]) => {
   }
 
   return bestCombination;
+};
+
+// Helper function to shuffle an array (Fisher-Yates shuffle)
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]]; // Swap elements
+  }
+  return newArray;
+};
+
+// Generate random teams using the same structure as balanced teams
+const generateRandomTeamsInternal = (selectedPlayers: PlayerWithSkills[]) => {
+  if (selectedPlayers.length !== 4) {
+    return null;
+  }
+
+  // Calculate team rating using player skills (can reuse from generateBalancedTeams context or redefine if needed)
+  const calculateTeamRating = (players: PlayerWithSkills[]) => {
+    const team = assignRoles(players);
+    return (team.defense.defenseSkill * 5 + team.offense.offenseSkill * 5) / 10;
+  };
+
+  const shuffledPlayers = shuffleArray(selectedPlayers);
+
+  const team1Players = [shuffledPlayers[0], shuffledPlayers[1]];
+  const team2Players = [shuffledPlayers[2], shuffledPlayers[3]];
+
+  const team1Roles = assignRoles(team1Players);
+  const team2Roles = assignRoles(team2Players);
+
+  const team1Rating = calculateTeamRating(team1Players);
+  const team2Rating = calculateTeamRating(team2Players);
+  const ratingDifference = Math.abs(team1Rating - team2Rating);
+
+  return {
+    team1: team1Players,
+    team2: team2Players,
+    team1Roles: team1Roles,
+    team2Roles: team2Roles,
+    team1Rating: team1Rating,
+    team2Rating: team2Rating,
+    ratingDifference: ratingDifference, // Still calculated for consistency, though not "optimal"
+  };
 };
 
 // Calculate player skill metrics based on their stats
@@ -173,10 +221,11 @@ interface HistoricalPredictionScenario {
   predictedScore: { team1: number; team2: number };
 }
 
-export const OptimalTeams = () => {
+export const TeamSelection = () => {
   const [playersWithSkills, setPlayersWithSkills] = useState<PlayerWithSkills[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
-  const [optimalTeamData, setOptimalTeamData] = useState<any>(null); // Stores result from generateBalancedTeams
+  const [optimalTeamData, setOptimalTeamData] = useState<any>(null); // Stores result from generateBalancedTeams or random
+  const [teamSelectionMode, setTeamSelectionMode] = useState<'optimal' | 'random'>('optimal'); // Added state for selection mode
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
@@ -224,20 +273,26 @@ export const OptimalTeams = () => {
     const selectedPlayers = playersWithSkills.filter(
       player => selectedPlayerIds.includes(player.id.toString())
     );
-    const balancedTeamInfo = generateBalancedTeams(selectedPlayers);
-    setOptimalTeamData(balancedTeamInfo);
 
-    if (balancedTeamInfo) {
+    let generatedTeamSetup = null;
+    if (teamSelectionMode === 'optimal') {
+      generatedTeamSetup = generateBalancedTeams(selectedPlayers);
+    } else { 
+      generatedTeamSetup = generateRandomTeamsInternal(selectedPlayers);
+    }
+    setOptimalTeamData(generatedTeamSetup); 
+
+    if (generatedTeamSetup) { 
       try {
-        const team1Player1 = balancedTeamInfo.team1[0];
-        const team1Player2 = balancedTeamInfo.team1[1];
-        const team2Player1 = balancedTeamInfo.team2[0];
-        const team2Player2 = balancedTeamInfo.team2[1];
+        const team1Player1 = generatedTeamSetup.team1[0];
+        const team1Player2 = generatedTeamSetup.team1[1];
+        const team2Player1 = generatedTeamSetup.team2[0];
+        const team2Player2 = generatedTeamSetup.team2[1];
 
-        const team1DefPlayer = balancedTeamInfo.team1Roles.defense;
-        const team1OffPlayer = balancedTeamInfo.team1Roles.offense;
-        const team2DefPlayer = balancedTeamInfo.team2Roles.defense;
-        const team2OffPlayer = balancedTeamInfo.team2Roles.offense;
+        const team1DefPlayer = generatedTeamSetup.team1Roles.defense;
+        const team1OffPlayer = generatedTeamSetup.team1Roles.offense;
+        const team2DefPlayer = generatedTeamSetup.team2Roles.defense;
+        const team2OffPlayer = generatedTeamSetup.team2Roles.offense;
 
         // 1. ELO Based Prediction (Overall)
         const t1DefElo = team1DefPlayer.elo_defense || 1400;
@@ -332,7 +387,23 @@ export const OptimalTeams = () => {
 
   return (
     <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg={useColorModeValue("white", "gray.800")}>
-      <Heading as="h2" size="lg" mb={6} color={useColorModeValue("gray.700", "whiteAlpha.900")}>Optimal Teams Generator</Heading>
+      <Heading as="h2" size="lg" mb={6} color={useColorModeValue("gray.700", "whiteAlpha.900")}>Team Selection</Heading>
+
+      <FormControl display="flex" alignItems="center" mb={6}>
+        <FormLabel htmlFor="team-selection-mode-switch" mb="0">
+          Team Generation Mode:
+        </FormLabel>
+        <Switch
+          id="team-selection-mode-switch"
+          isChecked={teamSelectionMode === 'random'}
+          onChange={() => setTeamSelectionMode(prev => prev === 'optimal' ? 'random' : 'optimal')}
+          colorScheme="teal"
+          mr={2}
+        />
+        <Text fontWeight="bold">
+          {teamSelectionMode === 'optimal' ? 'Optimal' : 'Random'}
+        </Text>
+      </FormControl>
 
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
@@ -382,7 +453,7 @@ export const OptimalTeams = () => {
             isDisabled={selectedPlayerIds.length !== 4 || loadingPredictions}
             isLoading={loadingPredictions}
           >
-            Generate Optimal Teams & Predictions
+            Generate Teams & Predictions
           </Button>
 
           {loadingPredictions && (
@@ -392,12 +463,13 @@ export const OptimalTeams = () => {
           {!loadingPredictions && optimalTeamData && (
             <Box>
               <Divider mb={6} />
-              <Heading as="h3" size="md" mb={6} textAlign="center" color={useColorModeValue("gray.700", "whiteAlpha.900")}>Optimal Balanced Teams</Heading>
+              <Heading as="h3" size="md" mb={6} textAlign="center" color={useColorModeValue("gray.700", "whiteAlpha.900")}>Team Composition</Heading>
               <Text textAlign="center" mb={1} fontSize="sm" color={useColorModeValue("gray.600", "gray.400")}>
                 Team ratings are based on a custom skill formula (D: 50%, O: 50%). Predictions below use ELO.
               </Text>
               <Text textAlign="center" mb={4} fontSize="sm" color={useColorModeValue("gray.600", "gray.400")}>
-                Rating Difference: <Badge colorScheme={optimalTeamData.ratingDifference < 5 ? "green" : "yellow"}>{optimalTeamData.ratingDifference.toFixed(1)}</Badge> (Lower is more balanced based on skills)
+                Skill Rating Difference: <Badge colorScheme={optimalTeamData.ratingDifference < 1 ? "green" : optimalTeamData.ratingDifference < 3 ? "yellow" : "red"}>{optimalTeamData.ratingDifference.toFixed(1)}</Badge>
+                {teamSelectionMode === 'optimal' && " (Lower is more balanced)"}
               </Text>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={6}>
                 <Card variant="filled" borderWidth={'1px'} borderColor={'gray.200'} bg={useColorModeValue("white", "orange.800")}>

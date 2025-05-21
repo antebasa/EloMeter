@@ -7,7 +7,7 @@ import {Layout} from '../components/Layout';
 import {EnterScore} from '../components/EnterScore';
 import {MatchOdds} from '../components/MatchOdds';
 import {History} from '../components/History';
-import {OptimalTeams} from '../components/OptimalTeams';
+import {TeamSelection} from '../components/OptimalTeams';
 import {Players} from '../components/Players';
 import {AddPlayer} from '../components/AddPlayer';
 import type {MatchData} from "../lib/supabase"; // Assuming supabase.ts exports this type
@@ -48,7 +48,7 @@ const DashboardPage: React.FC = () => {
             case 'History':
                 return <History selectedPlayerIdProp={selectedPlayerIdForHistory} onDoneWithSelectedPlayer={clearSelectedPlayerIdForHistory} />;
             case 'OptimalTeams':
-                return <OptimalTeams />;
+                return <TeamSelection />;
             case 'Players':
                 return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
             case 'AddPlayer':
