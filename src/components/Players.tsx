@@ -141,7 +141,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               const played = user.played || 0;
               const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
 
-              const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.slice(0, 5);
+              const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.reverse().slice(0, 5);
 
               return {
                 ...user,
