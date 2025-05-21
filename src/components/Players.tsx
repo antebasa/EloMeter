@@ -43,6 +43,9 @@ import {getPlayerMatchHistory, getUsers} from "../lib/supabase";
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
   avatar_url?: string;
+  elo_offense?: number;
+  elo_defense?: number;
+  elo_overall?: number;
 }
 
 // Updated to match the structure returned by getPlayerMatchHistory
@@ -68,6 +71,9 @@ interface MatchHistoryDisplayEntry {
 interface PlayerWithStats extends User {
   winPercentage: number;
   recentFormDetailed: MatchHistoryDisplayEntry[];
+  elo_overall?: number; // Added for overall ranking
+  elo_offense?: number;
+  elo_defense?: number;
 }
 
 // Define props for Players component
@@ -99,7 +105,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     key: keyof PlayerWithStats;
     direction: 'ascending' | 'descending';
   }>({ key: 'elo_offense', direction: 'descending' });
-  const [activeTab, setActiveTab] = useState(0); // 0 for offense, 1 for defense
+  const [activeTab, setActiveTab] = useState(0); // 0 for offense, 1 for defense, 2 for overall
 
   useEffect(() => {
     async function loadUsers() {
@@ -143,10 +149,17 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
 
               const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.slice(0, 5);
 
+              const offenseElo = user.elo_offense ?? 1400; // Use nullish coalescing for 0 ELO
+              const defenseElo = user.elo_defense ?? 1400; // Use nullish coalescing for 0 ELO
+              const overallElo = Math.round((offenseElo + defenseElo) / 2);
+
               return {
                 ...user,
                 winPercentage,
-                recentFormDetailed: recentMatchesDetailed
+                recentFormDetailed: recentMatchesDetailed,
+                elo_offense: offenseElo,
+                elo_defense: defenseElo,
+                elo_overall: overallElo,
               };
             } catch (fetchError) {
               console.error(`Error fetching/processing match history for player ${user.id}:`, fetchError);
@@ -159,11 +172,13 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
           })
         );
 
-        let sortedPlayersList = [...playersWithRecentForm];
+        let sortedPlayersList = [...playersWithRecentForm] as PlayerWithStats[];
         if (activeTab === 0) {
           sortedPlayersList.sort((a, b) => (b.elo_offense || 0) - (a.elo_offense || 0));
-        } else {
+        } else if (activeTab === 1) {
           sortedPlayersList.sort((a, b) => (b.elo_defense || 0) - (a.elo_defense || 0));
+        } else { // activeTab === 2 for Overall
+          sortedPlayersList.sort((a, b) => (b.elo_overall || 0) - (a.elo_overall || 0));
         }
 
         setPlayers(sortedPlayersList);
@@ -218,7 +233,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
 
   const handleTabChange = (index: number) => {
     setActiveTab(index);
-    const keyToSort = index === 0 ? 'elo_offense' : 'elo_defense';
+    const keyToSort: keyof PlayerWithStats = index === 0 ? 'elo_offense' : index === 1 ? 'elo_defense' : 'elo_overall';
     setSortConfig({ key: keyToSort, direction: 'descending' });
 
     const sortedPlayersList = [...players].sort((a, b) => {
@@ -345,6 +360,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
         <TabList mb={4} justifyContent="center">
           <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Offense Rankings</Tab>
           <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Defense Rankings</Tab>
+          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Overall Rankings</Tab>
         </TabList>
 
         <TabPanels>
@@ -419,6 +435,44 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                       <Td isNumeric fontWeight="bold" color="purple.500">{player.elo_defense || 1400}</Td>
                       <Td isNumeric>{player.played || 0}</Td>
                       <Td isNumeric>{player.conceded || 0}</Td>
+                      <Td isNumeric>{player.winPercentage}%</Td>
+                      <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
+          </TabPanel>
+
+          <TabPanel p={0}>
+            <Box overflowX="auto">
+              <Table variant="simple" size="md" bg={tableBg} boxShadow="md" borderRadius="md">
+                <Thead bg={headerBg}>
+                  <Tr>
+                    <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
+                    <Th cursor="pointer" onClick={() => handleSort('elo_overall')}>Overall ELO{renderSortIcon('elo_overall')}</Th>
+                    <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
+                    <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
+                    <Th>Recent Form</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {filteredPlayers.map(player => (
+                    <Tr
+                      key={player.id}
+                      _hover={{ bg: rowHoverBg }}
+                      transition="background-color 0.2s ease-in-out"
+                      cursor="pointer"
+                      onClick={() => onPlayerClick(player.id)}
+                    >
+                      <Td>
+                        <Flex align="center">
+                          <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
+                          <Text fontWeight="medium">{player.name}</Text>
+                        </Flex>
+                      </Td>
+                      <Td isNumeric fontWeight="bold" color="purple.500">{player.elo_overall || 1400}</Td>
+                      <Td isNumeric>{player.played || 0}</Td>
                       <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>

@@ -42,7 +42,7 @@ const generateBalancedTeams = (selectedPlayers: PlayerWithSkills[]) => {
   // Calculate team rating using player skills
   const calculateTeamRating = (players: PlayerWithSkills[]) => {
     const team = assignRoles(players);
-    return (team.defense.defenseSkill * 4 + team.offense.offenseSkill * 6) / 10;
+    return (team.defense.defenseSkill * 5 + team.offense.offenseSkill * 5) / 10;
   };
 
   // All possible team combinations (6 possible combinations with 4 players)
@@ -394,7 +394,7 @@ export const OptimalTeams = () => {
               <Divider mb={6} />
               <Heading as="h3" size="md" mb={6} textAlign="center" color={useColorModeValue("gray.700", "whiteAlpha.900")}>Optimal Balanced Teams</Heading>
               <Text textAlign="center" mb={1} fontSize="sm" color={useColorModeValue("gray.600", "gray.400")}>
-                Team ratings are based on a custom skill formula (D: 40%, O: 60%). Predictions below use ELO.
+                Team ratings are based on a custom skill formula (D: 50%, O: 50%). Predictions below use ELO.
               </Text>
               <Text textAlign="center" mb={4} fontSize="sm" color={useColorModeValue("gray.600", "gray.400")}>
                 Rating Difference: <Badge colorScheme={optimalTeamData.ratingDifference < 5 ? "green" : "yellow"}>{optimalTeamData.ratingDifference.toFixed(1)}</Badge> (Lower is more balanced based on skills)

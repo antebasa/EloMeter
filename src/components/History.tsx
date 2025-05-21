@@ -186,7 +186,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
   };
 
   // Calculate combined ELO (weighted average)
-  const combinedElo = Math.round((playerStats.elo_offense * 0.6) + (playerStats.elo_defense * 0.4));
+  const combinedElo = Math.round((playerStats.elo_offense + playerStats.elo_defense) / 2);
 
   if (!initialLoadComplete && !selectedPlayerIdProp) {
     return <Flex justify="center" align="center" height="200px"><Spinner size="xl" /></Flex>;
