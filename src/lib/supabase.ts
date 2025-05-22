@@ -335,7 +335,7 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       team_id!inner ( id, player_defense_id, player_offense_id, name )
     `)
     .eq('user_id', userId)
-    .order('id', { referencedTable: 'match_id', ascending: false });
+      .order('id', { ascending: false });
 
   console.log(playerStatsEntries)
 

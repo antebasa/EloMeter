@@ -219,7 +219,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               const wins = user.wins || 0;
               const played = user.played || 0; // Overall played from User table
               const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
-              const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.reverse().slice(0, 5);
+              const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.slice(0, 5);
               console.log(`[DEBUG Players.tsx] recentMatchesDetailed for user ${user.id} (for chips):`, JSON.parse(JSON.stringify(recentMatchesDetailed)));
 
               const offenseElo = user.elo_offense ?? 1400;
