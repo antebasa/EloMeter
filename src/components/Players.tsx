@@ -1,5 +1,5 @@
-import {useEffect, useState} from "react";
 import type {ReactNode} from "react";
+import {useEffect, useState} from "react";
 import {
   Alert,
   AlertDescription,
@@ -389,7 +389,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                     >
                       <Td>
                         <Flex align="center">
-                          <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
+                          <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined} />
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
                       </Td>
@@ -397,7 +397,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                       <Td isNumeric>{player.played || 0}</Td>
                       <Td isNumeric>{player.scored || 0}</Td>
                       <Td isNumeric>{player.winPercentage}%</Td>
-                      <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
+                      <Td>{renderRecentForm(player.recentFormDetailed) as ReactNode}</Td>
                     </Tr>
                   )) as ReactNode}
                 </Tbody>
@@ -429,7 +429,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                     >
                       <Td>
                         <Flex align="center">
-                          <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
+                          <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined} />
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
                       </Td>
@@ -468,7 +468,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                     >
                       <Td>
                         <Flex align="center">
-                          <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url || undefined} />
+                          <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined} />
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
                       </Td>
