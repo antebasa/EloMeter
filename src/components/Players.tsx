@@ -82,6 +82,13 @@ interface PlayersProps {
   onPlayerClick: (playerId: number) => void;
 }
 
+const positionColor = (position: number): string | undefined => {
+  if (position === 0) return "#b5a64255"
+  else if (position === 1) return "#c0c0c0aa"
+  else if (position === 2) return "#cd7f3255"
+  return
+}
+
 export const Players = ({ onPlayerClick }: PlayersProps) => {
   // Moved useColorModeValue calls to the top
   const tableBg = useColorModeValue("white", "gray.750");
@@ -379,16 +386,18 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {filteredPlayers.map(player => (
+                  {filteredPlayers.map((player, idx) => (
                     <Tr
                       key={player.id}
                       _hover={{ bg: rowHoverBg }}
                       transition="background-color 0.2s ease-in-out"
                       cursor="pointer"
                       onClick={() => onPlayerClick(player.id)}
+                      backgroundColor={positionColor(idx)}
                     >
                       <Td>
                         <Flex align="center">
+                          <Text mr={'20px'} fontWeight="medium">{idx + 1}.</Text>
                           <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined} />
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
@@ -419,16 +428,18 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {filteredPlayers.map(player => (
+                  {filteredPlayers.map((player, idx) => (
                     <Tr
                       key={player.id}
                       _hover={{ bg: rowHoverBg }}
                       transition="background-color 0.2s ease-in-out"
                       cursor="pointer"
                       onClick={() => onPlayerClick(player.id)}
+                      backgroundColor={positionColor(idx)}
                     >
                       <Td>
                         <Flex align="center">
+                          <Text mr={'20px'} fontWeight="medium">{idx + 1}.</Text>
                           <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined} />
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
@@ -458,16 +469,18 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {filteredPlayers.map(player => (
+                  {filteredPlayers.map((player, idx) => (
                     <Tr
                       key={player.id}
                       _hover={{ bg: rowHoverBg }}
                       transition="background-color 0.2s ease-in-out"
                       cursor="pointer"
                       onClick={() => onPlayerClick(player.id)}
+                      backgroundColor={positionColor(idx)}
                     >
                       <Td>
                         <Flex align="center">
+                          <Text mr={'20px'} fontWeight="medium">{idx + 1}.</Text>
                           <Avatar size="sm" name={player.name} mr={3} src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined} />
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
