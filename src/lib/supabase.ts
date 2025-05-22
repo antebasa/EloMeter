@@ -61,8 +61,8 @@ interface JoinedMatchDetails {
 
 interface JoinedTeamDetails {
     id: number;
-    user1_id: number;
-    user2_id: number;
+    player_defense_id: number;
+    player_offense_id: number;
     name?: string;
 }
 
@@ -111,15 +111,12 @@ function updateElo(playerElo: number, expectedScore: number, actualScore: number
 }
 
 // Helper to get or create a team
-async function getOrCreateTeam(user1Id: number, user2Id: number, matchDate?: string | Date, teamName?: string): Promise<number> {
-  const u1 = Math.min(user1Id, user2Id);
-  const u2 = Math.max(user1Id, user2Id);
-
+async function getOrCreateTeam(defenderId: number, offenderId: number, matchDate?: string | Date, teamName?: string): Promise<number> {
   const { data: existingTeams, error: fetchError } = await supabase
     .from('Team')
     .select('id')
-    .eq('user1_id', u1)
-    .eq('user2_id', u2)
+    .eq('player_defense_id', defenderId)
+    .eq('player_offense_id', offenderId)
     .limit(1);
 
   if (fetchError) {
@@ -130,8 +127,32 @@ async function getOrCreateTeam(user1Id: number, user2Id: number, matchDate?: str
   if (existingTeams && existingTeams.length > 0) {
     return existingTeams[0].id;
   } else {
-    const newTeamData: any = { user1_id: u1, user2_id: u2 };
-    if (teamName) newTeamData.name = teamName;
+    const newTeamData: any = { player_defense_id: defenderId, player_offense_id: offenderId };
+    
+    if (teamName) {
+      newTeamData.name = teamName;
+    } else {
+      // Fetch player names to create a default team name
+      const { data: defenderData, error: defenderError } = await supabase
+        .from('User')
+        .select('name')
+        .eq('id', defenderId)
+        .single();
+
+      const { data: offenderData, error: offenderError } = await supabase
+        .from('User')
+        .select('name')
+        .eq('id', offenderId)
+        .single();
+
+      if (defenderError || offenderError || !defenderData || !offenderData) {
+        console.error('Error fetching player names for default team name:', defenderError, offenderError);
+        // Fallback name if fetching fails
+        newTeamData.name = `Team ${defenderId}(D)-${offenderId}(O)`;
+      } else {
+        newTeamData.name = `${defenderData.name} (D) & ${offenderData.name} (O)`;
+      }
+    }
 
     // DB schema for Team.created_at is 'date'
     newTeamData.created_at = matchDate ? new Date(matchDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
@@ -310,7 +331,7 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
     .select(`
       id, user_id, created_at, scored, conceded, old_elo, new_elo, old_elo_offense, new_elo_offense, 
       match_id!inner ( id, created_at, white_team_id, blue_team_id, team_white_score, team_blue_score ),
-      team_id!inner ( id, user1_id, user2_id, name )
+      team_id!inner ( id, player_defense_id, player_offense_id, name )
     `)
     .eq('user_id', userId)
     .order('created_at', { foreignTable: 'match_id', ascending: false });
@@ -336,7 +357,7 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
   if (uniqueTeamIdsArray.length > 0) {
     const { data: teams, error: teamsError } = await supabase
       .from('Team')
-      .select('id, user1_id, user2_id, name')
+      .select('id, player_defense_id, player_offense_id, name')
       .in('id', uniqueTeamIdsArray);
     if (teamsError) {
       console.error('Error fetching teams for history:', teamsError);
@@ -348,8 +369,8 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
 
   const allUserIdsInHistory = new Set<number>();
   Object.values(teamDetailsMap).forEach(team => {
-    if (team.user1_id) allUserIdsInHistory.add(team.user1_id);
-    if (team.user2_id) allUserIdsInHistory.add(team.user2_id);
+    if (team.player_defense_id) allUserIdsInHistory.add(team.player_defense_id);
+    if (team.player_offense_id) allUserIdsInHistory.add(team.player_offense_id);
   });
   // Also ensure the user whose history is being fetched is included, in case they have no teams (should not happen with PlayerMatchStats)
   allUserIdsInHistory.add(userId);
@@ -389,7 +410,7 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
 
     let teammateName = '-';
     if (playerTeamDetails) {
-        const teammateId = playerTeamDetails.user1_id === userId ? playerTeamDetails.user2_id : playerTeamDetails.user1_id;
+        const teammateId = playerTeamDetails.player_defense_id === userId ? playerTeamDetails.player_offense_id : playerTeamDetails.player_defense_id;
         if (teammateId !== userId) {
              teammateName = userMap[teammateId]?.name || 'Unknown';
         }
@@ -401,9 +422,9 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
     if (opponentTeamId) {
         const opponentTeamDetails = teamDetailsMap[opponentTeamId];
         if (opponentTeamDetails) {
-            const opp1Name = userMap[opponentTeamDetails.user1_id]?.name || 'Player';
-            const opp2Name = userMap[opponentTeamDetails.user2_id]?.name || 'Player';
-            opponentsString = opponentTeamDetails.user1_id === opponentTeamDetails.user2_id ? opp1Name : `${opp1Name} & ${opp2Name}`;
+            const opp1Name = userMap[opponentTeamDetails.player_defense_id]?.name || 'Player';
+            const opp2Name = userMap[opponentTeamDetails.player_offense_id]?.name || 'Player';
+            opponentsString = `${opp1Name} & ${opp2Name}`;
         }
     }
 
@@ -506,25 +527,25 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
 }
 
 export async function getMatchHistoryBetweenTeams(
-  team1Player1Id: number, 
-  team1Player2Id: number, 
-  team2Player1Id: number, 
-  team2Player2Id: number,
+  team1DefenderId: number, 
+  team1OffenderId: number, 
+  team2DefenderId: number, 
+  team2OffenderId: number,
   limit: number = 3
 ): Promise<any[]> {
   try {
     // Ensure canonical representation for team players (order by ID)
-    const t1p1 = Math.min(team1Player1Id, team1Player2Id);
-    const t1p2 = Math.max(team1Player1Id, team1Player2Id);
-    const t2p1 = Math.min(team2Player1Id, team2Player2Id);
-    const t2p2 = Math.max(team2Player1Id, team2Player2Id);
+    // const t1p1 = Math.min(team1Player1Id, team1Player2Id); // Removed
+    // const t1p2 = Math.max(team1Player1Id, team1Player2Id); // Removed
+    // const t2p1 = Math.min(team2Player1Id, team2Player2Id); // Removed
+    // const t2p2 = Math.max(team2Player1Id, team2Player2Id); // Removed
 
-    // Find Team IDs for both teams
+    // Find Team IDs for both teams using specific defender/offender IDs
     const { data: team1Data, error: team1Error } = await supabase
       .from('Team')
       .select('id')
-      .eq('user1_id', t1p1)
-      .eq('user2_id', t1p2)
+      .eq('player_defense_id', team1DefenderId)
+      .eq('player_offense_id', team1OffenderId)
       .maybeSingle(); // Use maybeSingle as team might not exist
 
     if (team1Error) throw team1Error;
@@ -533,8 +554,8 @@ export async function getMatchHistoryBetweenTeams(
     const { data: team2Data, error: team2Error } = await supabase
       .from('Team')
       .select('id')
-      .eq('user1_id', t2p1)
-      .eq('user2_id', t2p2)
+      .eq('player_defense_id', team2DefenderId)
+      .eq('player_offense_id', team2OffenderId)
       .maybeSingle();
 
     if (team2Error) throw team2Error;
@@ -577,10 +598,10 @@ export interface HistoricalMatchupStats {
 }
 
 export async function getHistoricalMatchupStatsByColor(
-  teamAPlayer1Id: number,
-  teamAPlayer2Id: number,
-  teamBPlayer1Id: number,
-  teamBPlayer2Id: number
+  teamADefenderId: number,
+  teamAOffenderId: number,
+  teamBDefenderId: number,
+  teamBOffenderId: number
 ): Promise<HistoricalMatchupStats> {
   const result: HistoricalMatchupStats = {
     teamA_as_white: { wins: 0, losses: 0, draws: 0, total_played: 0 },
@@ -588,17 +609,17 @@ export async function getHistoricalMatchupStatsByColor(
   };
 
   try {
-    const teamA_u1 = Math.min(teamAPlayer1Id, teamAPlayer2Id);
-    const teamA_u2 = Math.max(teamAPlayer1Id, teamAPlayer2Id);
-    const teamB_u1 = Math.min(teamBPlayer1Id, teamBPlayer2Id);
-    const teamB_u2 = Math.max(teamBPlayer1Id, teamBPlayer2Id);
+    // const teamA_u1 = Math.min(teamAPlayer1Id, teamAPlayer2Id); // Removed
+    // const teamA_u2 = Math.max(teamAPlayer1Id, teamAPlayer2Id); // Removed
+    // const teamB_u1 = Math.min(teamBPlayer1Id, teamBPlayer2Id); // Removed
+    // const teamB_u2 = Math.max(teamBPlayer1Id, teamBPlayer2Id); // Removed
 
     // Get Team ID for Team A
     const { data: teamAData, error: teamAError } = await supabase
       .from('Team')
       .select('id')
-      .eq('user1_id', teamA_u1)
-      .eq('user2_id', teamA_u2)
+      .eq('player_defense_id', teamADefenderId)
+      .eq('player_offense_id', teamAOffenderId)
       .maybeSingle();
 
     if (teamAError) throw teamAError;
@@ -609,8 +630,8 @@ export async function getHistoricalMatchupStatsByColor(
     const { data: teamBData, error: teamBError } = await supabase
       .from('Team')
       .select('id')
-      .eq('user1_id', teamB_u1)
-      .eq('user2_id', teamB_u2)
+      .eq('player_defense_id', teamBDefenderId)
+      .eq('player_offense_id', teamBOffenderId)
       .maybeSingle();
 
     if (teamBError) throw teamBError;
