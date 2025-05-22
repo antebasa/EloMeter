@@ -295,6 +295,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                   borderRadius="full"
                   px={2}
                   cursor="help"
+                  opacity={1 - (2 * index / 10)}
                 >
                   {resultChar}
                 </Badge>
