@@ -379,7 +379,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
-                    <Th cursor="pointer" onClick={() => handleSort('elo_offense')}>Off. ELO{renderSortIcon('elo_offense')}</Th>
+                    <Th cursor="pointer" onClick={() => handleSort('elo_offense')} isNumeric>Off. ELO{renderSortIcon('elo_offense')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('scored')}>Scored{renderSortIcon('scored')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
@@ -421,7 +421,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
-                    <Th cursor="pointer" onClick={() => handleSort('elo_defense')}>Def. ELO{renderSortIcon('elo_defense')}</Th>
+                    <Th cursor="pointer" onClick={() => handleSort('elo_defense')} isNumeric>Def. ELO{renderSortIcon('elo_defense')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('conceded')}>Conceded{renderSortIcon('conceded')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
@@ -463,7 +463,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
-                    <Th cursor="pointer" onClick={() => handleSort('elo_overall')}>Overall ELO{renderSortIcon('elo_overall')}</Th>
+                    <Th cursor="pointer" onClick={() => handleSort('elo_overall')} isNumeric>Overall ELO{renderSortIcon('elo_overall')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
                     <Th>Recent Form</Th>
@@ -486,7 +486,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
                       </Td>
-                      <Td isNumeric fontWeight="bold" color="purple.500">{player.elo_overall || 1400}</Td>
+                      <Td isNumeric fontWeight="bold" color="green.500">{player.elo_overall || 1400}</Td>
                       <Td isNumeric>{player.played || 0}</Td>
                       <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
