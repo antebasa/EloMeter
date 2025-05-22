@@ -128,7 +128,7 @@ async function getOrCreateTeam(defenderId: number, offenderId: number, matchDate
     return existingTeams[0].id;
   } else {
     const newTeamData: any = { player_defense_id: defenderId, player_offense_id: offenderId };
-    
+
     if (teamName) {
       newTeamData.name = teamName;
     } else {
@@ -312,7 +312,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
       if ('elo_offense' in update && update.elo_offense !== undefined) {
         userStatUpdate.elo_offense = update.elo_offense;
       }
-      
+
       const { error: userUpdateError } = await supabase.from('User').update(userStatUpdate).eq('id', update.id);
       if (userUpdateError) {
         console.error(`Error updating user ${update.id}:`, userUpdateError);
@@ -422,9 +422,15 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
     if (opponentTeamId) {
         const opponentTeamDetails = teamDetailsMap[opponentTeamId];
         if (opponentTeamDetails) {
-            const opp1Name = userMap[opponentTeamDetails.player_defense_id]?.name || 'Player';
-            const opp2Name = userMap[opponentTeamDetails.player_offense_id]?.name || 'Player';
-            opponentsString = `${opp1Name} & ${opp2Name}`;
+            // Prefer the team's actual name if available (should be after backfill script)
+            if (opponentTeamDetails.name) {
+                opponentsString = opponentTeamDetails.name;
+            } else {
+                // Fallback if name is somehow not set (e.g., new team created before name generation, or backfill missed it)
+                const oppDefName = userMap[opponentTeamDetails.player_defense_id]?.name || 'Player D'; // Added role hint
+                const oppOffName = userMap[opponentTeamDetails.player_offense_id]?.name || 'Player O'; // Added role hint
+                opponentsString = `${oppDefName} & ${oppOffName}`; // Simpler, roles are in the name from getOrCreateTeam ideally
+            }
         }
     }
 
@@ -527,9 +533,9 @@ export async function getPlayerEloHistory(userId: number): Promise<any[]> {
 }
 
 export async function getMatchHistoryBetweenTeams(
-  team1DefenderId: number, 
-  team1OffenderId: number, 
-  team2DefenderId: number, 
+  team1DefenderId: number,
+  team1OffenderId: number,
+  team2DefenderId: number,
   team2OffenderId: number,
   limit: number = 3
 ): Promise<any[]> {
@@ -659,7 +665,7 @@ export async function getHistoricalMatchupStatsByColor(
     const { data: teamABlueMatches, error: teamABlueError } = await supabase
       .from('Match')
       .select('team_white_score, team_blue_score')
-      .eq('blue_team_id', teamAId) 
+      .eq('blue_team_id', teamAId)
       .eq('white_team_id', teamBId);
 
     if (teamABlueError) console.error('Error fetching Team A blue matches:', teamABlueError);
