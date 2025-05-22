@@ -38,8 +38,8 @@ import {
   useColorModeValue
 } from "@chakra-ui/react";
 import {SearchIcon} from '@chakra-ui/icons';
-import type {User as SupabaseUser} from "../lib/supabase";
-import {getPlayerMatchHistory, getUsers} from "../lib/supabase";
+import type {User as SupabaseUser, PlayerMatchStatsQueryResultEntry} from "../lib/supabase";
+import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats} from "../lib/supabase";
 
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
@@ -75,6 +75,14 @@ interface PlayerWithStats extends User {
   elo_overall?: number; // Added for overall ranking
   elo_offense?: number;
   elo_defense?: number;
+
+  // Role-specific aggregated stats
+  scoredAsDefense?: number;
+  concededAsDefense?: number;
+  matchesAsDefense?: number;
+  scoredAsOffense?: number;
+  concededAsOffense?: number;
+  matchesAsOffense?: number;
 }
 
 // Define props for Players component
@@ -121,22 +129,79 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
         setLoading(true);
         setError(null);
         const fetchedUsers: User[] = await getUsers();
+        // Fetch all player match stats once
+        const allStats: PlayerMatchStatsQueryResultEntry[] = await getAllPlayerMatchStats();
 
-        const playersWithRecentForm = await Promise.all(
+        // Group all stats by user_id for efficient lookup
+        const statsByUser = allStats.reduce((acc, stat) => {
+          const userId = stat.user_id;
+          if (!acc[userId]) {
+            acc[userId] = [];
+          }
+          acc[userId].push(stat);
+          return acc;
+        }, {} as Record<number, PlayerMatchStatsQueryResultEntry[]>);
+
+
+        const playersWithAllStats = await Promise.all(
           fetchedUsers.map(async (user) => {
             if (!user.id) return {
               ...user,
               winPercentage: 0,
-              recentFormDetailed: []
-            };
+              recentFormDetailed: [],
+              scoredAsDefense: 0,
+              concededAsDefense: 0,
+              matchesAsDefense: 0,
+              scoredAsOffense: 0,
+              concededAsOffense: 0,
+              matchesAsOffense: 0,
+            } as PlayerWithStats; // Cast to satisfy type
+
+            // Role-specific aggregations
+            let scoredAsDefense = 0;
+            let concededAsDefense = 0;
+            let matchesAsDefense = 0;
+            let scoredAsOffense = 0;
+            let concededAsOffense = 0;
+            let matchesAsOffense = 0;
+
+            const userStats = statsByUser[user.id] || [];
+
+            userStats.forEach((stat: PlayerMatchStatsQueryResultEntry) => {
+              // Determine role played in this match
+              // Defense ELO changed = played defense
+              if (stat.new_elo !== stat.old_elo && stat.new_elo_offense === stat.old_elo_offense) {
+                matchesAsDefense++;
+                scoredAsDefense += stat.scored;
+                concededAsDefense += stat.conceded;
+              }
+              // Offense ELO changed = played offense
+              else if (stat.new_elo_offense !== stat.old_elo_offense && stat.new_elo === stat.old_elo) {
+                matchesAsOffense++;
+                scoredAsOffense += stat.scored;
+                concededAsOffense += stat.conceded;
+              }
+              // Fallback or ambiguous case: if only one changed, assign to that role
+              // This might need refinement based on how ELO updates always happen for both in PlayerMatchStats
+              else if (stat.new_elo !== stat.old_elo) { // Primarily a defensive role ELO update
+                matchesAsDefense++;
+                scoredAsDefense += stat.scored;
+                concededAsDefense += stat.conceded;
+              } else if (stat.new_elo_offense !== stat.old_elo_offense) { // Primarily an offensive role ELO update
+                 matchesAsOffense++;
+                scoredAsOffense += stat.scored;
+                concededAsOffense += stat.conceded;
+              }
+              // If neither ELO specific to role changed but general stats exist, it's harder to categorize
+              // For now, this logic prioritizes distinct ELO changes.
+            });
 
             try {
-              // getPlayerMatchHistory now returns an array of objects that should somewhat match MatchHistoryDisplayEntry
-              // We need to ensure the fields required by MatchHistoryDisplayEntry are present or mapped.
               const rawMatchHistory = await getPlayerMatchHistory(user.id);
+              console.log(`[DEBUG Players.tsx] rawMatchHistory for user ${user.id}:`, JSON.parse(JSON.stringify(rawMatchHistory)));
 
               const processedMatchHistory: MatchHistoryDisplayEntry[] = rawMatchHistory.map((match: any) => ({
-                id: match.id, // This is PlayerMatchStats.id
+                id: match.id,
                 match_db_id: match.match_db_id,
                 date: match.date,
                 result: match.result,
@@ -152,13 +217,13 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               }));
 
               const wins = user.wins || 0;
-              const played = user.played || 0;
+              const played = user.played || 0; // Overall played from User table
               const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
-
               const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.reverse().slice(0, 5);
+              console.log(`[DEBUG Players.tsx] recentMatchesDetailed for user ${user.id} (for chips):`, JSON.parse(JSON.stringify(recentMatchesDetailed)));
 
-              const offenseElo = user.elo_offense ?? 1400; // Use nullish coalescing for 0 ELO
-              const defenseElo = user.elo_defense ?? 1400; // Use nullish coalescing for 0 ELO
+              const offenseElo = user.elo_offense ?? 1400;
+              const defenseElo = user.elo_defense ?? 1400;
               const overallElo = Math.round((offenseElo + defenseElo) / 2);
 
               return {
@@ -168,19 +233,34 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 elo_offense: offenseElo,
                 elo_defense: defenseElo,
                 elo_overall: overallElo,
+                scoredAsDefense,
+                concededAsDefense,
+                matchesAsDefense,
+                scoredAsOffense,
+                concededAsOffense,
+                matchesAsOffense,
               };
             } catch (fetchError) {
               console.error(`Error fetching/processing match history for player ${user.id}:`, fetchError);
               return {
                 ...user,
                 winPercentage: 0,
-                recentFormDetailed: []
-              };
+                recentFormDetailed: [],
+                elo_offense: user.elo_offense ?? 1400,
+                elo_defense: user.elo_defense ?? 1400,
+                elo_overall: Math.round(((user.elo_offense ?? 1400) + (user.elo_defense ?? 1400)) / 2),
+                scoredAsDefense: 0,
+                concededAsDefense: 0,
+                matchesAsDefense: 0,
+                scoredAsOffense: 0,
+                concededAsOffense: 0,
+                matchesAsOffense: 0,
+              } as PlayerWithStats; // Cast to satisfy type
             }
           })
         );
 
-        let sortedPlayersList = [...playersWithRecentForm] as PlayerWithStats[];
+        let sortedPlayersList = [...playersWithAllStats] as PlayerWithStats[];
         if (activeTab === 0) {
           sortedPlayersList.sort((a, b) => (b.elo_offense || 0) - (a.elo_offense || 0));
         } else if (activeTab === 1) {
@@ -379,9 +459,15 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
-                    <Th cursor="pointer" onClick={() => handleSort('elo_offense')} isNumeric>Off. ELO{renderSortIcon('elo_offense')}</Th>
+                    {activeTab === 0 && ( // Offense Tab
+                      <>
+                        <Th cursor="pointer" onClick={() => handleSort('elo_offense')}>Off. ELO {renderSortIcon('elo_offense')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('scoredAsOffense')}>Scored (O) {renderSortIcon('scoredAsOffense')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('concededAsOffense')}>Conceded (O) {renderSortIcon('concededAsOffense')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('matchesAsOffense')}>Played (O) {renderSortIcon('matchesAsOffense')}</Th>
+                      </>
+                    )}
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
-                    <Th isNumeric cursor="pointer" onClick={() => handleSort('scored')}>Scored{renderSortIcon('scored')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
                     <Th>Recent Form</Th>
                   </Tr>
@@ -403,9 +489,16 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
                       </Td>
-                      <Td isNumeric fontWeight="bold" color="teal.500">{player.elo_offense || 1400}</Td>
+                      {/* Offense Stats */}
+                      {activeTab === 0 && (
+                        <>
+                          <Td>{player.elo_offense || 1400}</Td>
+                          <Td>{player.scoredAsOffense || 0}</Td>
+                          <Td>{player.concededAsOffense || 0}</Td>
+                          <Td>{player.matchesAsOffense || 0}</Td>
+                        </>
+                      )}
                       <Td isNumeric>{player.played || 0}</Td>
-                      <Td isNumeric>{player.scored || 0}</Td>
                       <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed) as ReactNode}</Td>
                     </Tr>
@@ -421,9 +514,15 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
-                    <Th cursor="pointer" onClick={() => handleSort('elo_defense')} isNumeric>Def. ELO{renderSortIcon('elo_defense')}</Th>
+                    {activeTab === 1 && ( // Defense Tab
+                      <>
+                        <Th cursor="pointer" onClick={() => handleSort('elo_defense')}>Def. ELO {renderSortIcon('elo_defense')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('scoredAsDefense')}>Scored (D) {renderSortIcon('scoredAsDefense')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('concededAsDefense')}>Conceded (D) {renderSortIcon('concededAsDefense')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('matchesAsDefense')}>Played (D) {renderSortIcon('matchesAsDefense')}</Th>
+                      </>
+                    )}
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
-                    <Th isNumeric cursor="pointer" onClick={() => handleSort('conceded')}>Conceded{renderSortIcon('conceded')}</Th>
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
                     <Th>Recent Form</Th>
                   </Tr>
@@ -445,9 +544,16 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
                       </Td>
-                      <Td isNumeric fontWeight="bold" color="purple.500">{player.elo_defense || 1400}</Td>
+                      {/* Defense Stats */}
+                      {activeTab === 1 && (
+                        <>
+                          <Td>{player.elo_defense || 1400}</Td>
+                          <Td>{player.scoredAsDefense || 0}</Td>
+                          <Td>{player.concededAsDefense || 0}</Td>
+                          <Td>{player.matchesAsDefense || 0}</Td>
+                        </>
+                      )}
                       <Td isNumeric>{player.played || 0}</Td>
-                      <Td isNumeric>{player.conceded || 0}</Td>
                       <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>
@@ -463,8 +569,14 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
-                    <Th cursor="pointer" onClick={() => handleSort('elo_overall')} isNumeric>Overall ELO{renderSortIcon('elo_overall')}</Th>
-                    <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
+                    {activeTab === 2 && ( // Overall Tab
+                      <>
+                        <Th cursor="pointer" onClick={() => handleSort('elo_overall')}>Overall ELO {renderSortIcon('elo_overall')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('scored')}>Total Scored {renderSortIcon('scored')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('conceded')}>Total Conceded {renderSortIcon('conceded')}</Th>
+                        <Th cursor="pointer" onClick={() => handleSort('played')}>Total Played {renderSortIcon('played')}</Th>
+                      </>
+                    )}
                     <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
                     <Th>Recent Form</Th>
                   </Tr>
@@ -486,9 +598,16 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Text fontWeight="medium">{player.name}</Text>
                         </Flex>
                       </Td>
-                      <Td isNumeric fontWeight="bold" color="green.500">{player.elo_overall || 1400}</Td>
-                      <Td isNumeric>{player.played || 0}</Td>
-                      <Td isNumeric>{player.winPercentage}%</Td>
+                      {/* Overall Stats */}
+                      {activeTab === 2 && (
+                        <>
+                          <Td>{player.elo_overall || 1400}</Td>
+                          <Td>{player.scored || 0}</Td>{/* Total scored from User table */}
+                          <Td>{player.conceded || 0}</Td>{/* Total conceded from User table */}
+                          <Td>{player.played || 0}</Td>{/* Total played from User table */}
+                        </>
+                      )}
+                      <Td>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>
                   )) as ReactNode}

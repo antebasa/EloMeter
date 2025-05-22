@@ -68,7 +68,8 @@ interface JoinedTeamDetails {
 
 // This is the type for entries coming from the PlayerMatchStats table itself,
 // with foreign keys resolved to actual objects due to joins.
-interface PlayerMatchStatsQueryResultEntry {
+// This interface is now exported for use in Players.tsx
+export interface PlayerMatchStatsQueryResultEntry {
     id: number;
     user_id: number;
     created_at: string; // This is the created_at from PlayerMatchStats, should be match date
@@ -334,7 +335,9 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       team_id!inner ( id, player_defense_id, player_offense_id, name )
     `)
     .eq('user_id', userId)
-    .order('created_at', { foreignTable: 'match_id', ascending: false });
+    .order('id', { referencedTable: 'match_id', ascending: false });
+
+  console.log(playerStatsEntries)
 
   if (pmsError || !playerStatsEntries) {
     console.error('Error fetching player match stats:', pmsError);
@@ -684,4 +687,30 @@ export async function getHistoricalMatchupStatsByColor(
     console.error('Error in getHistoricalMatchupStatsByColor:', error);
     return result; // Return default empty stats on major error
   }
+}
+
+// New function to get all PlayerMatchStats entries
+export async function getAllPlayerMatchStats(): Promise<PlayerMatchStatsQueryResultEntry[]> {
+  const { data, error } = await supabase
+    .from('PlayerMatchStats')
+    // Select all necessary fields for role-specific stat aggregation and recent history display
+    // Ensure JoinedMatchDetails and JoinedTeamDetails fields are included if they were part of PlayerMatchStatsQueryResultEntry
+    // For raw aggregation, we primarily need: user_id, scored, conceded, old_elo, new_elo, old_elo_offense, new_elo_offense
+    // The PlayerMatchStatsQueryResultEntry includes joined data, which might be heavy if we only need raw stats here.
+    // However, to keep it consistent with the type Players.tsx expects for its processing loop, we select all.
+    // If performance becomes an issue for very large PlayerMatchStats tables,
+    // consider creating a leaner version of this function or a dedicated one for aggregated stats.
+    .select(`
+      id, user_id, created_at, scored, conceded, old_elo, new_elo, old_elo_offense, new_elo_offense,
+      match_id!inner ( id, created_at, white_team_id, blue_team_id, team_white_score, team_blue_score ),
+      team_id!inner ( id, player_defense_id, player_offense_id, name )
+    `);
+
+  if (error) {
+    console.error('Error fetching all player match stats:', error);
+    return [];
+  }
+  // The 'data' can be complex. We cast to 'unknown' first, then to the target type.
+  // This satisfies the linter that we're acknowledging the type conversion risk.
+  return (data as unknown as PlayerMatchStatsQueryResultEntry[]) || [];
 }
