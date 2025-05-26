@@ -735,15 +735,13 @@ export const PlayerComparison: React.FC = () => {
     const opponentMatches = comparisonData.headToHeadMatches.filter(match => !match.sameTeam);
     const teammateMatches = comparisonData.headToHeadMatches.filter(match => match.sameTeam);
 
-    // Head-to-Head (Opponents) Stats
+    // Head-to-Head (Opponents) Stats - no draws possible in first-to-10
     const h2hPlayer1Wins = opponentMatches.filter(match => match.player1Result === 'Win').length;
     const h2hPlayer2Wins = opponentMatches.filter(match => match.player2Result === 'Win').length;
-    const h2hDraws = opponentMatches.filter(match => match.player1Result === 'Draw').length;
 
-    // Team Performance Stats
+    // Team Performance Stats - count team wins/losses (no draws possible)
     const teamWins = teammateMatches.filter(match => match.player1Result === 'Win').length;
     const teamLosses = teammateMatches.filter(match => match.player1Result === 'Loss').length;
-    const teamDraws = teammateMatches.filter(match => match.player1Result === 'Draw').length;
 
     return (
       <VStack spacing={6} align="stretch">
@@ -764,10 +762,6 @@ export const PlayerComparison: React.FC = () => {
                 <Stat size="sm">
                   <StatLabel>{comparisonData.player2!.name} Wins</StatLabel>
                   <StatNumber color="green.500">{h2hPlayer2Wins}</StatNumber>
-                </Stat>
-                <Stat size="sm">
-                  <StatLabel>Draws</StatLabel>
-                  <StatNumber color="gray.500">{h2hDraws}</StatNumber>
                 </Stat>
               </HStack>
             </CardHeader>
@@ -791,8 +785,7 @@ export const PlayerComparison: React.FC = () => {
                         <VStack spacing={0}>
                           <Text
                             fontWeight={match.player1Result === 'Win' ? 'bold' : 'normal'}
-                            color={match.player1Result === 'Win' ? 'green.500' :
-                                   match.player1Result === 'Loss' ? 'red.500' : 'gray.500'}
+                            color={match.player1Result === 'Win' ? 'green.500' : 'red.500'}
                           >
                             {match.player1Score}
                           </Text>
@@ -803,8 +796,7 @@ export const PlayerComparison: React.FC = () => {
                         <VStack spacing={0}>
                           <Text
                             fontWeight={match.player2Result === 'Win' ? 'bold' : 'normal'}
-                            color={match.player2Result === 'Win' ? 'green.500' :
-                                   match.player2Result === 'Loss' ? 'red.500' : 'gray.500'}
+                            color={match.player2Result === 'Win' ? 'green.500' : 'red.500'}
                           >
                             {match.player2Score}
                           </Text>
@@ -819,13 +811,9 @@ export const PlayerComparison: React.FC = () => {
                       <Td textAlign="center">
                         <Tag
                           size="sm"
-                          colorScheme={
-                            match.player1Result === 'Win' ? 'blue' :
-                            match.player2Result === 'Win' ? 'green' : 'gray'
-                          }
+                          colorScheme={match.player1Result === 'Win' ? 'blue' : 'green'}
                         >
-                          {match.player1Result === 'Win' ? comparisonData.player1!.name :
-                           match.player2Result === 'Win' ? comparisonData.player2!.name : 'Draw'}
+                          {match.player1Result === 'Win' ? comparisonData.player1!.name : comparisonData.player2!.name}
                         </Tag>
                       </Td>
                       <Td textAlign="center">
@@ -876,10 +864,6 @@ export const PlayerComparison: React.FC = () => {
                   <StatNumber color="red.500">{teamLosses}</StatNumber>
                 </Stat>
                 <Stat size="sm">
-                  <StatLabel>Team Draws</StatLabel>
-                  <StatNumber color="gray.500">{teamDraws}</StatNumber>
-                </Stat>
-                <Stat size="sm">
                   <StatLabel>Win Rate</StatLabel>
                   <StatNumber color="blue.500">
                     {teammateMatches.length > 0 ? Math.round((teamWins / teammateMatches.length) * 100) : 0}%
@@ -907,8 +891,7 @@ export const PlayerComparison: React.FC = () => {
                       <Td textAlign="center">
                         <Text
                           fontWeight="bold"
-                          color={match.player1Result === 'Win' ? 'green.500' :
-                                 match.player1Result === 'Loss' ? 'red.500' : 'gray.500'}
+                          color={match.player1Result === 'Win' ? 'green.500' : 'red.500'}
                         >
                           {match.player1Score}
                         </Text>
@@ -916,8 +899,7 @@ export const PlayerComparison: React.FC = () => {
                       <Td textAlign="center">
                         <Text
                           fontWeight="bold"
-                          color={match.player1Result === 'Win' ? 'red.500' :
-                                 match.player1Result === 'Loss' ? 'green.500' : 'gray.500'}
+                          color={match.player1Result === 'Win' ? 'red.500' : 'green.500'}
                         >
                           {match.player2Score}
                         </Text>
@@ -925,13 +907,9 @@ export const PlayerComparison: React.FC = () => {
                       <Td textAlign="center">
                         <Tag
                           size="sm"
-                          colorScheme={
-                            match.player1Result === 'Win' ? 'green' :
-                            match.player1Result === 'Loss' ? 'red' : 'gray'
-                          }
+                          colorScheme={match.player1Result === 'Win' ? 'green' : 'red'}
                         >
-                          {match.player1Result === 'Win' ? 'Team Win' :
-                           match.player1Result === 'Loss' ? 'Team Loss' : 'Team Draw'}
+                          {match.player1Result === 'Win' ? 'Team Win' : 'Team Loss'}
                         </Tag>
                       </Td>
                       <Td textAlign="center">
