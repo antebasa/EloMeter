@@ -124,19 +124,19 @@ const PersonalInfo: React.FC = () => {
 
     if (authLoading) {
         return (
-            <Box p={8} display="flex" justifyContent="center" alignItems="center" height="200px">
+            <Box p={{ base: 4, md: 8 }} display="flex" justifyContent="center" alignItems="center" height="200px">
                 <Spinner size="xl" color="white" />
-                <Text ml={4} color="white">Loading user information...</Text>
+                <Text ml={4} color="white" fontSize={{ base: "sm", md: "md" }}>Loading user information...</Text>
             </Box>
         );
     }
 
     return (
-        <Box p={8}>
-            <VStack spacing={6} align="stretch" maxW="md" mx="auto">
-                <Heading size="lg" color="white">Personal Information</Heading>
+        <Box p={{ base: 4, md: 8 }}>
+            <VStack spacing={{ base: 4, md: 6 }} align="stretch" maxW="md" mx="auto">
+                <Heading size={{ base: "md", md: "lg" }} color="white" textAlign="center">Personal Information</Heading>
                 <FormControl id="display-name">
-                    <FormLabel color="white">Display Name</FormLabel>
+                    <FormLabel color="white" fontSize={{ base: "sm", md: "md" }}>Display Name</FormLabel>
                     <Input
                         type="text"
                         value={displayName}
@@ -146,6 +146,7 @@ const PersonalInfo: React.FC = () => {
                         borderColor="gray.600" // Border color for input
                         _hover={{ borderColor: 'gray.500' }}
                         _focus={{ borderColor: 'blue.500', boxShadow: '0 0 0 1px teal.500' }}
+                        size={{ base: "md", md: "lg" }}
                     />
                 </FormControl>
                 <Button
@@ -153,6 +154,8 @@ const PersonalInfo: React.FC = () => {
                     onClick={handleSave}
                     isLoading={loading}
                     isDisabled={loading || !displayName.trim() || displayName.trim() === initialDisplayName}
+                    size={{ base: "md", md: "lg" }}
+                    width="100%"
                 >
                     Save Display Name
                 </Button>

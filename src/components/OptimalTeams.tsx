@@ -419,30 +419,41 @@ export const TeamSelection = () => {
       ) : (
         <>
           <Box mb={6}>
-            <Heading as="h3" size="md" mb={4}>Select 4 Players</Heading>
-            <CheckboxGroup
-              colorScheme="blue"
-              value={selectedPlayerIds}
-              onChange={handlePlayerSelection}
-            >
-              <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={3}>
-                {playersWithSkills.map(player => (
-                  <Checkbox
-                    key={player.id}
-                    value={player.id.toString()}
-                    isDisabled={selectedPlayerIds.length >= 4 && !selectedPlayerIds.includes(player.id.toString())}
-                  >
-                    <HStack borderWidth={1} borderRadius={'4px'} padding={'8px'}>
-                      <Text>{player.name}</Text>
-                      <VStack>
-                        <Badge textAlign={'center'} width={'80px'} colorScheme="green">O: {player.elo_offense || 1400}</Badge>
-                        <Badge textAlign={'center'} width={'80px'} colorScheme="blue">D: {player.elo_defense || 1400}</Badge>
-                      </VStack>
-                    </HStack>
-                  </Checkbox>
-                ))}
-              </SimpleGrid>
-            </CheckboxGroup>
+            <Heading as="h3" size={{ base: "md", md: "lg" }} mb={4} color={useColorModeValue("gray.700", "whiteAlpha.900")}>Select 4 Players</Heading>
+            {loading && <Spinner size="xl" color="teal.500" />}
+            {error && <Alert status="error"><AlertIcon />{error}</Alert>}
+            {!loading && !error && (
+              <CheckboxGroup colorScheme="teal" onChange={handlePlayerSelection} value={selectedPlayerIds}>
+                <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing={{ base: 3, md: 4 }} mb={6}>
+                  {playersWithSkills.map((player) => (
+                    <Box
+                      key={player.id}
+                      borderWidth="1px"
+                      borderRadius="lg"
+                      p={{ base: 2, md: 3 }}
+                      boxShadow="sm"
+                      bg={useColorModeValue("gray.50", "gray.700")}
+                      minW={{ base: "auto", sm: "180px" }} // Ensure a minimum width on sm screens and up
+                      w="100%" // Ensure full width usage within the grid cell
+                    >
+                      <Checkbox value={player.id.toString()} isDisabled={selectedPlayerIds.length >= 4 && !selectedPlayerIds.includes(player.id.toString())}>
+                        <Flex direction="column" align="start">
+                          <Text fontSize={{ base: "sm", md: "md" }} fontWeight="bold">{player.name}</Text>
+                          <HStack mt={1} spacing={2}>
+                            <Badge colorScheme="orange" fontSize={{ base: "2xs", md: "xs" }} px={{ base: 1, md: 2 }} py={0.5} borderRadius="md">
+                              O: {player.offenseSkill}
+                            </Badge>
+                            <Badge colorScheme="blue" fontSize={{ base: "2xs", md: "xs" }} px={{ base: 1, md: 2 }} py={0.5} borderRadius="md">
+                              D: {player.defenseSkill}
+                            </Badge>
+                          </HStack>
+                        </Flex>
+                      </Checkbox>
+                    </Box>
+                  ))}
+                </SimpleGrid>
+              </CheckboxGroup>
+            )}
           </Box>
 
           <Button

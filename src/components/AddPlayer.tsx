@@ -85,26 +85,34 @@ export const AddPlayer = () => {
   };
 
   return (
-    <Box maxWidth="500px" mx="auto" mt={10} p={6} borderRadius="lg" boxShadow="md" bg="white">
-      <Heading as="h2" size="lg" mb={6}>Add New Player</Heading>
+    <Box 
+      maxWidth={{ base: "100%", md: "500px" }} 
+      mx="auto" 
+      mt={{ base: 5, md: 10 }} 
+      p={{ base: 4, md: 6 }} 
+      borderRadius="lg" 
+      boxShadow="md" 
+      bg="white"
+    >
+      <Heading as="h2" size={{ base: "md", md: "lg" }} mb={{ base: 4, md: 6 }} textAlign="center">Add New Player</Heading>
 
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
           <AlertIcon />
-          <Text>{error}</Text>
+          <Text fontSize={{ base: "sm", md: "md" }}>{error}</Text>
         </Alert>
       )}
 
       {success && (
         <Alert status="success" mb={4} borderRadius="md">
           <AlertIcon />
-          <Text>Player added successfully!</Text>
+          <Text fontSize={{ base: "sm", md: "md" }}>Player added successfully!</Text>
         </Alert>
       )}
 
-      <VStack spacing={4} align="stretch">
+      <VStack spacing={{ base: 3, md: 4 }} align="stretch">
         <FormControl isRequired isInvalid={nameError !== ""}>
-          <FormLabel>Player Name</FormLabel>
+          <FormLabel fontSize={{ base: "sm", md: "md" }}>Player Name</FormLabel>
           <InputGroup>
             <InputLeftElement pointerEvents="none">
               👤
@@ -114,13 +122,14 @@ export const AddPlayer = () => {
               name="name"
               value={formData.name}
               onChange={handleChange}
+              size={{ base: "md", md: "lg" }}
             />
           </InputGroup>
-          <FormErrorMessage>{nameError}</FormErrorMessage>
+          <FormErrorMessage fontSize={{ base: "xs", md: "sm" }}>{nameError}</FormErrorMessage>
         </FormControl>
 
         <FormControl isInvalid={formData.email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)}>
-          <FormLabel>Email (optional)</FormLabel>
+          <FormLabel fontSize={{ base: "sm", md: "md" }}>Email (optional)</FormLabel>
           <InputGroup>
             <InputLeftElement pointerEvents="none">
               ✉️
@@ -131,16 +140,19 @@ export const AddPlayer = () => {
               value={formData.email}
               onChange={handleChange}
               type="email"
+              size={{ base: "md", md: "lg" }}
             />
           </InputGroup>
-          <FormErrorMessage>Please enter a valid email address.</FormErrorMessage>
+          <FormErrorMessage fontSize={{ base: "xs", md: "sm" }}>Please enter a valid email address.</FormErrorMessage>
         </FormControl>
 
-        <Flex justify="space-between" mt={2}>
+        <Flex justify="space-between" mt={2} direction={{ base: "column", sm: "row" }} gap={{ base: 2, sm: 0 }}>
           <Button
             variant="outline"
             onClick={() => setFormData({ name: "", email: "" })}
             isDisabled={loading || (!formData.name && !formData.email)}
+            size={{ base: "md", md: "lg" }}
+            width={{ base: "100%", sm: "auto" }}
           >
             Reset
           </Button>
@@ -150,14 +162,16 @@ export const AddPlayer = () => {
             onClick={handleSubmit}
             isLoading={loading}
             isDisabled={loading || !formData.name || (formData.email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))}
+            size={{ base: "md", md: "lg" }}
+            width={{ base: "100%", sm: "auto" }}
           >
             Add Player
           </Button>
         </Flex>
       </VStack>
 
-      <Text fontSize="sm" color="gray.500" mt={4}>
-        New players start with a default ELO rating of 1500. Their rating will change as they play matches.
+      <Text fontSize={{ base: "xs", md: "sm" }} color="gray.500" mt={{ base: 3, md: 4 }} textAlign="center">
+        New players start with a default ELO rating of 1400. Their rating will change as they play matches.
       </Text>
     </Box>
   );
