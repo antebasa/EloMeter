@@ -184,7 +184,8 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
         overflowY="auto" 
         p="5" 
         bg="#2D3748"
-        pt={{ base: "80px", md: "5" }} // Add top padding on mobile for fixed header
+        pt={{ base: "80px", md: "5" }}
+        pb={{ base: "80px", md: "5" }} // Add bottom padding on mobile to ensure content is accessible
       >
         {children}
       </Box>

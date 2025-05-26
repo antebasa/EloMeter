@@ -67,7 +67,7 @@ const positionColor = (position: number): string | undefined => {
   return undefined;
 };
 
-export const WinPercentage: React.FC = () => {
+export const WinPercentage = () => {
   const [stats, setStats] = useState<WinPercentageStats | null>(null);
   const [playerStats, setPlayerStats] = useState<PlayerTeamStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -368,94 +368,103 @@ export const WinPercentage: React.FC = () => {
           </Heading>
         </CardHeader>
         <CardBody pt={2}>
-          <Table variant="simple" size={{ base: "sm", md: "md" }}>
-            <Thead>
-              <Tr>
-                <Th
-                  cursor="pointer"
-                  onClick={() => handleSort('name', position, teamColor)}
-                  color={textColor}
-                  fontSize={{ base: "xs", md: "sm" }}
-                >
-                  Player{renderSortIcon('name', position, teamColor)}
-                </Th>
-                <Th
-                  cursor="pointer"
-                  onClick={() => handleSort('wins', position, teamColor)}
-                  isNumeric
-                  color={textColor}
-                  fontSize={{ base: "xs", md: "sm" }}
-                >
-                  Wins{renderSortIcon('wins', position, teamColor)}
-                </Th>
-                <Th
-                  cursor="pointer"
-                  onClick={() => handleSort('total', position, teamColor)}
-                  isNumeric
-                  color={textColor}
-                  fontSize={{ base: "xs", md: "sm" }}
-                >
-                  Total{renderSortIcon('total', position, teamColor)}
-                </Th>
-                <Th
-                  cursor="pointer"
-                  onClick={() => handleSort('winPercentage', position, teamColor)}
-                  isNumeric
-                  color={textColor}
-                  fontSize={{ base: "xs", md: "sm" }}
-                >
-                  Win %{renderSortIcon('winPercentage', position, teamColor)}
-                </Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {sortedPlayers.slice(0, 10).map((player, idx) => {
-                const wins = teamColor === 'blue'
-                  ? (position === 'defense' ? player.wins_as_blue_defense : player.wins_as_blue_offense)
-                  : (position === 'defense' ? player.wins_as_white_defense : player.wins_as_white_offense);
-                const total = teamColor === 'blue'
-                  ? (position === 'defense' ? player.total_blue_defense : player.total_blue_offense)
-                  : (position === 'defense' ? player.total_white_defense : player.total_white_offense);
-
-                return (
-                  <Tr
-                    key={`${player.id}-${teamColor}-${position}`}
-                    _hover={{ bg: rowHoverBg }}
-                    transition="background-color 0.2s ease-in-out"
-                    backgroundColor={positionColor(idx)}
+          <Box overflowX="auto">
+            <Table variant="simple" size={{ base: "sm", md: "md" }} minW={{ base: "300px", md: "auto" }}>
+              <Thead>
+                <Tr>
+                  <Th
+                    cursor="pointer"
+                    onClick={() => handleSort('name', position, teamColor)}
+                    color={textColor}
+                    fontSize={{ base: "xs", md: "sm" }}
+                    minW={{ base: "120px", md: "auto" }}
                   >
-                    <Td>
-                      <Flex align="center">
-                        <Text mr={'15px'} fontWeight="medium" color={playerNameColor} fontSize={{ base: "xs", md: "sm" }}>
-                          {idx + 1}.
+                    Player{renderSortIcon('name', position, teamColor)}
+                  </Th>
+                  <Th
+                    cursor="pointer"
+                    onClick={() => handleSort('wins', position, teamColor)}
+                    isNumeric
+                    color={textColor}
+                    fontSize={{ base: "xs", md: "sm" }}
+                  >
+                    Wins{renderSortIcon('wins', position, teamColor)}
+                  </Th>
+                  <Th
+                    cursor="pointer"
+                    onClick={() => handleSort('total', position, teamColor)}
+                    isNumeric
+                    color={textColor}
+                    fontSize={{ base: "xs", md: "sm" }}
+                  >
+                    Total{renderSortIcon('total', position, teamColor)}
+                  </Th>
+                  <Th
+                    cursor="pointer"
+                    onClick={() => handleSort('winPercentage', position, teamColor)}
+                    isNumeric
+                    color={textColor}
+                    fontSize={{ base: "xs", md: "sm" }}
+                  >
+                    Win %{renderSortIcon('winPercentage', position, teamColor)}
+                  </Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {sortedPlayers.slice(0, 10).map((player, idx) => {
+                  const wins = teamColor === 'blue'
+                    ? (position === 'defense' ? player.wins_as_blue_defense : player.wins_as_blue_offense)
+                    : (position === 'defense' ? player.wins_as_white_defense : player.wins_as_white_offense);
+                  const total = teamColor === 'blue'
+                    ? (position === 'defense' ? player.total_blue_defense : player.total_blue_offense)
+                    : (position === 'defense' ? player.total_white_defense : player.total_white_offense);
+
+                  return (
+                    <Tr
+                      key={`${player.id}-${teamColor}-${position}`}
+                      _hover={{ bg: rowHoverBg }}
+                      transition="background-color 0.2s ease-in-out"
+                      backgroundColor={positionColor(idx)}
+                    >
+                      <Td>
+                        <Flex align="center" minW={{ base: "100px", md: "auto" }}>
+                          <Text mr={{ base: 1, md: 3 }} fontWeight="medium" color={playerNameColor} fontSize={{ base: "xs", md: "sm" }}>
+                            {idx + 1}.
+                          </Text>
+                          <Avatar
+                            size={{ base: "xs", md: "sm" }}
+                            name={player.name}
+                            mr={{ base: 1, md: 2 }}
+                            src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined}
+                          />
+                          <Text 
+                            color={playerNameColor} 
+                            fontSize={{ base: "xs", md: "sm" }} 
+                            fontWeight="medium"
+                            noOfLines={1}
+                            maxW={{ base: "60px", md: "auto" }}
+                          >
+                            {player.name}
+                          </Text>
+                        </Flex>
+                      </Td>
+                      <Td isNumeric>
+                        <Text fontSize={{ base: "xs", md: "sm" }}>{wins}</Text>
+                      </Td>
+                      <Td isNumeric>
+                        <Text color={textColor} fontSize={{ base: "xs", md: "sm" }}>{total}</Text>
+                      </Td>
+                      <Td isNumeric>
+                        <Text color={textColor} fontWeight="bold" fontSize={{ base: "xs", md: "sm" }}>
+                          {getWinPercentage(wins, total)}%
                         </Text>
-                        <Avatar
-                          size={{ base: "xs", md: "sm" }}
-                          name={player.name}
-                          mr={2}
-                          src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined}
-                        />
-                        <Text color={playerNameColor} fontSize={{ base: "xs", md: "sm" }} fontWeight="medium">
-                          {player.name}
-                        </Text>
-                      </Flex>
-                    </Td>
-                    <Td isNumeric>
-                      <Text fontSize={{ base: "xs", md: "sm" }}>{wins}</Text>
-                    </Td>
-                    <Td isNumeric>
-                      <Text color={textColor} fontSize={{ base: "xs", md: "sm" }}>{total}</Text>
-                    </Td>
-                    <Td isNumeric>
-                      <Text color={textColor} fontWeight="bold" fontSize={{ base: "xs", md: "sm" }}>
-                        {getWinPercentage(wins, total)}%
-                      </Text>
-                    </Td>
-                  </Tr>
-                );
-              })}
-            </Tbody>
-          </Table>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </Tbody>
+            </Table>
+          </Box>
           {sortedPlayers.length === 0 && (
             <Text textAlign="center" color={textColor} py={4} fontSize={{ base: "sm", md: "md" }}>
               No players found for this position
@@ -577,20 +586,20 @@ export const WinPercentage: React.FC = () => {
           <CardBody>
             <Stat textAlign="center">
               <StatLabel color={textColor} fontSize={{ base: "sm", md: "md" }}>Total Matches</StatLabel>
-              <StatNumber color={textColor} fontSize={{ base: "xl", md: "2xl" }}>{stats.total_matches}</StatNumber>
+              <StatNumber color={textColor} fontSize={{ base: "xl", md: "2xl" }}>{stats?.total_matches || 0}</StatNumber>
             </Stat>
             <SimpleGrid columns={{ base: 2, md: 2 }} spacing={{ base: 2, md: 4 }}>
               <Stat textAlign="center">
                 <StatLabel color={textColor} fontSize={{ base: "xs", md: "sm" }}>Blue Wins</StatLabel>
-                <StatNumber color="blue.400" fontSize={{ base: "lg", md: "xl" }}>{stats.blue_wins}</StatNumber>
+                <StatNumber color="blue.400" fontSize={{ base: "lg", md: "xl" }}>{stats?.blue_wins || 0}</StatNumber>
               </Stat>
               <Stat textAlign="center">
                 <StatLabel color={textColor} fontSize={{ base: "xs", md: "sm" }}>White Wins</StatLabel>
-                <StatNumber color="gray.300" fontSize={{ base: "lg", md: "xl" }}>{stats.white_wins}</StatNumber>
+                <StatNumber color="gray.300" fontSize={{ base: "lg", md: "xl" }}>{stats?.white_wins || 0}</StatNumber>
               </Stat>
             </SimpleGrid>
 
-            {stats.total_matches > 0 && (
+            {stats && stats.total_matches > 0 && (
               <Box mt={{ base: 4, md: 6 }}>
                 <Text textAlign="center" color={textColor} mb={2} fontSize={{ base: "sm", md: "md" }}>
                   Win Distribution
@@ -625,7 +634,7 @@ export const WinPercentage: React.FC = () => {
         </Card>
 
         {/* Player Statistics Tables */}
-        <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={{ base: 4, md: 6 }}>
+        <SimpleGrid columns={{ base: 1, xl: 2 }} spacing={{ base: 4, md: 6 }}>
           {renderPlayerTable(playerStats, 'defense', 'blue')}
           {renderPlayerTable(playerStats, 'offense', 'blue')}
           {renderPlayerTable(playerStats, 'defense', 'white')}

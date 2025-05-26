@@ -320,6 +320,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
           type="submit"
           colorScheme="green"
           width="full"
+          mb={{ base: 4, md: 0 }}
           isLoading={loading || saving}
           isDisabled={loading || saving ||
                      !formData.team1Defense ||
