@@ -44,8 +44,6 @@ import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats} from "../lib/su
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
   avatar_url?: string;
-  elo_offense?: number;
-  elo_defense?: number;
   elo_overall?: number;
 }
 
@@ -71,18 +69,20 @@ interface MatchHistoryDisplayEntry {
 
 interface PlayerWithStats extends User {
   winPercentage: number;
+  winPercentageOffense?: number; // Win rate for matches played in offense
+  winPercentageDefense?: number; // Win rate for matches played in defense
   recentFormDetailed: MatchHistoryDisplayEntry[];
   elo_overall?: number; // Added for overall ranking
-  elo_offense?: number;
-  elo_defense?: number;
 
   // Role-specific aggregated stats
   scoredAsDefense?: number;
   concededAsDefense?: number;
   matchesAsDefense?: number;
+  winsAsDefense?: number; // Added for defense win rate calculation
   scoredAsOffense?: number;
   concededAsOffense?: number;
   matchesAsOffense?: number;
+  winsAsOffense?: number; // Added for offense win rate calculation
 }
 
 // Define props for Players component
@@ -148,22 +148,28 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
             if (!user.id) return {
               ...user,
               winPercentage: 0,
+              winPercentageOffense: 0,
+              winPercentageDefense: 0,
               recentFormDetailed: [],
               scoredAsDefense: 0,
               concededAsDefense: 0,
               matchesAsDefense: 0,
+              winsAsDefense: 0,
               scoredAsOffense: 0,
               concededAsOffense: 0,
               matchesAsOffense: 0,
+              winsAsOffense: 0,
             } as PlayerWithStats; // Cast to satisfy type
 
             // Role-specific aggregations
             let scoredAsDefense = 0;
             let concededAsDefense = 0;
             let matchesAsDefense = 0;
+            let winsAsDefense = 0;
             let scoredAsOffense = 0;
             let concededAsOffense = 0;
             let matchesAsOffense = 0;
+            let winsAsOffense = 0;
 
             const userStats = statsByUser[user.id] || [];
 
@@ -174,12 +180,16 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 matchesAsDefense++;
                 scoredAsDefense += stat.scored;
                 concededAsDefense += stat.conceded;
+                console.log(11111, stat.scored, stat.conceded)
+                if (stat.scored > stat.conceded) winsAsDefense++;
               }
               // Offense ELO changed = played offense
               else if (stat.new_elo_offense !== stat.old_elo_offense && stat.new_elo === stat.old_elo) {
                 matchesAsOffense++;
                 scoredAsOffense += stat.scored;
                 concededAsOffense += stat.conceded;
+                console.log(222, stat.scored, stat.conceded)
+                if (stat.scored > stat.conceded) winsAsOffense++;
               }
               // Fallback or ambiguous case: if only one changed, assign to that role
               // This might need refinement based on how ELO updates always happen for both in PlayerMatchStats
@@ -187,18 +197,25 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 matchesAsDefense++;
                 scoredAsDefense += stat.scored;
                 concededAsDefense += stat.conceded;
+                console.log(33, stat.scored, stat.conceded)
+                if (stat.scored > stat.conceded) winsAsDefense++;
               } else if (stat.new_elo_offense !== stat.old_elo_offense) { // Primarily an offensive role ELO update
                  matchesAsOffense++;
                 scoredAsOffense += stat.scored;
                 concededAsOffense += stat.conceded;
+                console.log(44, stat.scored, stat.conceded)
+                if (stat.scored > stat.conceded) winsAsOffense++;
               }
               // If neither ELO specific to role changed but general stats exist, it's harder to categorize
               // For now, this logic prioritizes distinct ELO changes.
             });
 
+            // Calculate role-specific win percentages
+            const winPercentageOffense = matchesAsOffense > 0 ? Math.round((winsAsOffense / matchesAsOffense) * 100) : 0;
+            const winPercentageDefense = matchesAsDefense > 0 ? Math.round((winsAsDefense / matchesAsDefense) * 100) : 0;
+
             try {
               const rawMatchHistory = await getPlayerMatchHistory(user.id);
-              console.log(`[DEBUG Players.tsx] rawMatchHistory for user ${user.id}:`, JSON.parse(JSON.stringify(rawMatchHistory)));
 
               const processedMatchHistory: MatchHistoryDisplayEntry[] = rawMatchHistory.map((match: any) => ({
                 id: match.id,
@@ -220,7 +237,6 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               const played = user.played || 0; // Overall played from User table
               const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
               const recentMatchesDetailed: MatchHistoryDisplayEntry[] = processedMatchHistory.slice(0, 5);
-              console.log(`[DEBUG Players.tsx] recentMatchesDetailed for user ${user.id} (for chips):`, JSON.parse(JSON.stringify(recentMatchesDetailed)));
 
               const offenseElo = user.elo_offense ?? 1400;
               const defenseElo = user.elo_defense ?? 1400;
@@ -229,6 +245,8 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               return {
                 ...user,
                 winPercentage,
+                winPercentageOffense,
+                winPercentageDefense,
                 recentFormDetailed: recentMatchesDetailed,
                 elo_offense: offenseElo,
                 elo_defense: defenseElo,
@@ -236,15 +254,19 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 scoredAsDefense,
                 concededAsDefense,
                 matchesAsDefense,
+                winsAsDefense,
                 scoredAsOffense,
                 concededAsOffense,
                 matchesAsOffense,
+                winsAsOffense,
               };
             } catch (fetchError) {
               console.error(`Error fetching/processing match history for player ${user.id}:`, fetchError);
               return {
                 ...user,
                 winPercentage: 0,
+                winPercentageOffense: 0,
+                winPercentageDefense: 0,
                 recentFormDetailed: [],
                 elo_offense: user.elo_offense ?? 1400,
                 elo_defense: user.elo_defense ?? 1400,
@@ -252,9 +274,11 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                 scoredAsDefense: 0,
                 concededAsDefense: 0,
                 matchesAsDefense: 0,
+                winsAsDefense: 0,
                 scoredAsOffense: 0,
                 concededAsOffense: 0,
                 matchesAsOffense: 0,
+                winsAsOffense: 0,
               } as PlayerWithStats; // Cast to satisfy type
             }
           })
@@ -465,10 +489,9 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                         <Th cursor="pointer" onClick={() => handleSort('scoredAsOffense')}>Scored (O) {renderSortIcon('scoredAsOffense')}</Th>
                         <Th cursor="pointer" onClick={() => handleSort('concededAsOffense')}>Conceded (O) {renderSortIcon('concededAsOffense')}</Th>
                         <Th cursor="pointer" onClick={() => handleSort('matchesAsOffense')}>Played (O) {renderSortIcon('matchesAsOffense')}</Th>
+                        <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentageOffense')}>Win % (O) {renderSortIcon('winPercentageOffense')}</Th>
                       </>
                     )}
-                    <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
-                    <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
                     <Th>Recent Form</Th>
                   </Tr>
                 </Thead>
@@ -496,10 +519,9 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Td>{player.scoredAsOffense || 0}</Td>
                           <Td>{player.concededAsOffense || 0}</Td>
                           <Td>{player.matchesAsOffense || 0}</Td>
+                          <Td isNumeric>{player.winPercentageOffense || 0}%</Td>
                         </>
                       )}
-                      <Td isNumeric>{player.played || 0}</Td>
-                      <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed) as ReactNode}</Td>
                     </Tr>
                   )) as ReactNode}
@@ -520,10 +542,9 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                         <Th cursor="pointer" onClick={() => handleSort('scoredAsDefense')}>Scored (D) {renderSortIcon('scoredAsDefense')}</Th>
                         <Th cursor="pointer" onClick={() => handleSort('concededAsDefense')}>Conceded (D) {renderSortIcon('concededAsDefense')}</Th>
                         <Th cursor="pointer" onClick={() => handleSort('matchesAsDefense')}>Played (D) {renderSortIcon('matchesAsDefense')}</Th>
+                        <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentageDefense')}>Win % (D) {renderSortIcon('winPercentageDefense')}</Th>
                       </>
                     )}
-                    <Th isNumeric cursor="pointer" onClick={() => handleSort('played')}>Played{renderSortIcon('played')}</Th>
-                    <Th isNumeric cursor="pointer" onClick={() => handleSort('winPercentage')}>Win %{renderSortIcon('winPercentage')}</Th>
                     <Th>Recent Form</Th>
                   </Tr>
                 </Thead>
@@ -551,10 +572,9 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Td>{player.scoredAsDefense || 0}</Td>
                           <Td>{player.concededAsDefense || 0}</Td>
                           <Td>{player.matchesAsDefense || 0}</Td>
+                          <Td isNumeric>{player.winPercentageDefense || 0}%</Td>
                         </>
                       )}
-                      <Td isNumeric>{player.played || 0}</Td>
-                      <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>
                   )) as ReactNode}
@@ -607,7 +627,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Td>{player.played || 0}</Td>{/* Total played from User table */}
                         </>
                       )}
-                      <Td>{player.winPercentage}%</Td>
+                      <Td isNumeric>{player.winPercentage}%</Td>
                       <Td>{renderRecentForm(player.recentFormDetailed)}</Td>
                     </Tr>
                   )) as ReactNode}
