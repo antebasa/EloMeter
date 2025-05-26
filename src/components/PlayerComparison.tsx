@@ -720,133 +720,266 @@ export const PlayerComparison: React.FC = () => {
       return (
         <Card bg={cardBg}>
           <CardHeader>
-            <Heading size="md" color={textColor}>Head-to-Head Matches</Heading>
+            <Heading size="md" color={textColor}>Head-to-Head & Team Performance</Heading>
           </CardHeader>
           <CardBody>
             <Text textAlign="center" color="gray.500">
-              No head-to-head matches found between these players
+              No matches found between these players
             </Text>
           </CardBody>
         </Card>
       );
     }
 
-    // Calculate head-to-head stats
-    const player1Wins = comparisonData.headToHeadMatches.filter(match => match.player1Result === 'Win').length;
-    const player2Wins = comparisonData.headToHeadMatches.filter(match => match.player2Result === 'Win').length;
-    const draws = comparisonData.headToHeadMatches.filter(match => match.player1Result === 'Draw').length;
-    const totalMatches = comparisonData.headToHeadMatches.length;
+    // Separate matches by relationship
+    const opponentMatches = comparisonData.headToHeadMatches.filter(match => !match.sameTeam);
+    const teammateMatches = comparisonData.headToHeadMatches.filter(match => match.sameTeam);
 
-    const asTeammates = comparisonData.headToHeadMatches.filter(match => match.sameTeam).length;
-    const asOpponents = totalMatches - asTeammates;
+    // Head-to-Head (Opponents) Stats
+    const h2hPlayer1Wins = opponentMatches.filter(match => match.player1Result === 'Win').length;
+    const h2hPlayer2Wins = opponentMatches.filter(match => match.player2Result === 'Win').length;
+    const h2hDraws = opponentMatches.filter(match => match.player1Result === 'Draw').length;
+
+    // Team Performance Stats
+    const teamWins = teammateMatches.filter(match => match.player1Result === 'Win').length;
+    const teamLosses = teammateMatches.filter(match => match.player1Result === 'Loss').length;
+    const teamDraws = teammateMatches.filter(match => match.player1Result === 'Draw').length;
 
     return (
-      <Card bg={cardBg}>
-        <CardHeader>
-          <Heading size="md" color={textColor}>Head-to-Head Matches</Heading>
-          <HStack spacing={4} mt={2}>
-            <Stat size="sm">
-              <StatLabel>Total Matches</StatLabel>
-              <StatNumber>{totalMatches}</StatNumber>
-            </Stat>
-            <Stat size="sm">
-              <StatLabel>{comparisonData.player1!.name} Wins</StatLabel>
-              <StatNumber color="blue.500">{player1Wins}</StatNumber>
-            </Stat>
-            <Stat size="sm">
-              <StatLabel>{comparisonData.player2!.name} Wins</StatLabel>
-              <StatNumber color="green.500">{player2Wins}</StatNumber>
-            </Stat>
-            <Stat size="sm">
-              <StatLabel>Draws</StatLabel>
-              <StatNumber>{draws}</StatNumber>
-            </Stat>
-          </HStack>
-          <HStack spacing={4} mt={2}>
-            <Tag colorScheme="blue" size="sm">As Teammates: {asTeammates}</Tag>
-            <Tag colorScheme="red" size="sm">As Opponents: {asOpponents}</Tag>
-          </HStack>
-        </CardHeader>
-        <CardBody>
-          <Table variant="simple" size="sm">
-            <Thead>
-              <Tr>
-                <Th>Date</Th>
-                <Th>Relationship</Th>
-                <Th textAlign="center">{comparisonData.player1!.name}</Th>
-                <Th textAlign="center">{comparisonData.player2!.name}</Th>
-                <Th textAlign="center">Team Score</Th>
-                <Th textAlign="center">ELO Change</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {comparisonData.headToHeadMatches.slice(0, 10).map((match, index) => (
-                <Tr key={index}>
-                  <Td>{new Date(match.date).toLocaleDateString()}</Td>
-                  <Td>
-                    <Tag
-                      size="sm"
-                      colorScheme={match.sameTeam ? 'blue' : 'red'}
-                    >
-                      {match.sameTeam ? 'Teammates' : 'Opponents'}
-                    </Tag>
-                  </Td>
-                  <Td textAlign="center">
-                    <VStack spacing={0}>
-                      <Text
-                        fontWeight={match.player1Result === 'Win' ? 'bold' : 'normal'}
-                        color={match.player1Result === 'Win' ? 'green.500' :
-                               match.player1Result === 'Loss' ? 'red.500' : 'gray.500'}
-                      >
-                        {match.player1Score}
-                      </Text>
-                      <Text fontSize="xs" color="gray.500">{match.player1Result}</Text>
-                    </VStack>
-                  </Td>
-                  <Td textAlign="center">
-                    <VStack spacing={0}>
-                      <Text
-                        fontWeight={match.player2Result === 'Win' ? 'bold' : 'normal'}
-                        color={match.player2Result === 'Win' ? 'green.500' :
-                               match.player2Result === 'Loss' ? 'red.500' : 'gray.500'}
-                      >
-                        {match.player2Score}
-                      </Text>
-                      <Text fontSize="xs" color="gray.500">{match.player2Result}</Text>
-                    </VStack>
-                  </Td>
-                  <Td textAlign="center">
-                    <Text fontSize="sm">
-                      {match.teamWhiteScore} - {match.teamBlueScore}
-                    </Text>
-                  </Td>
-                  <Td textAlign="center">
-                    <VStack spacing={0}>
-                      <Text
-                        fontSize="xs"
-                        color={match.player1EloChange >= 0 ? 'green.500' : 'red.500'}
-                      >
-                        {match.player1EloChange >= 0 ? '+' : ''}{Math.round(match.player1EloChange)}
-                      </Text>
-                      <Text
-                        fontSize="xs"
-                        color={match.player2EloChange >= 0 ? 'green.500' : 'red.500'}
-                      >
-                        {match.player2EloChange >= 0 ? '+' : ''}{Math.round(match.player2EloChange)}
-                      </Text>
-                    </VStack>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-          {comparisonData.headToHeadMatches.length > 10 && (
-            <Text fontSize="sm" color="gray.500" mt={2} textAlign="center">
-              Showing latest 10 of {comparisonData.headToHeadMatches.length} matches
-            </Text>
-          )}
-        </CardBody>
-      </Card>
+      <VStack spacing={6} align="stretch">
+        {/* Head-to-Head (Opponents) Section */}
+        {opponentMatches.length > 0 && (
+          <Card bg={cardBg}>
+            <CardHeader>
+              <Heading size="md" color={textColor}>Head-to-Head (As Opponents)</Heading>
+              <HStack spacing={4} mt={2}>
+                <Stat size="sm">
+                  <StatLabel>Total H2H</StatLabel>
+                  <StatNumber>{opponentMatches.length}</StatNumber>
+                </Stat>
+                <Stat size="sm">
+                  <StatLabel>{comparisonData.player1!.name} Wins</StatLabel>
+                  <StatNumber color="blue.500">{h2hPlayer1Wins}</StatNumber>
+                </Stat>
+                <Stat size="sm">
+                  <StatLabel>{comparisonData.player2!.name} Wins</StatLabel>
+                  <StatNumber color="green.500">{h2hPlayer2Wins}</StatNumber>
+                </Stat>
+                <Stat size="sm">
+                  <StatLabel>Draws</StatLabel>
+                  <StatNumber color="gray.500">{h2hDraws}</StatNumber>
+                </Stat>
+              </HStack>
+            </CardHeader>
+            <CardBody>
+              <Table variant="simple" size="sm">
+                <Thead>
+                  <Tr>
+                    <Th>Date</Th>
+                    <Th textAlign="center">{comparisonData.player1!.name}</Th>
+                    <Th textAlign="center">{comparisonData.player2!.name}</Th>
+                    <Th textAlign="center">Final Score</Th>
+                    <Th textAlign="center">Winner</Th>
+                    <Th textAlign="center">ELO Change</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {opponentMatches.slice(0, 10).map((match, index) => (
+                    <Tr key={index}>
+                      <Td>{new Date(match.date).toLocaleDateString()}</Td>
+                      <Td textAlign="center">
+                        <VStack spacing={0}>
+                          <Text
+                            fontWeight={match.player1Result === 'Win' ? 'bold' : 'normal'}
+                            color={match.player1Result === 'Win' ? 'green.500' :
+                                   match.player1Result === 'Loss' ? 'red.500' : 'gray.500'}
+                          >
+                            {match.player1Score}
+                          </Text>
+                          <Text fontSize="xs" color="gray.500">{match.player1Result}</Text>
+                        </VStack>
+                      </Td>
+                      <Td textAlign="center">
+                        <VStack spacing={0}>
+                          <Text
+                            fontWeight={match.player2Result === 'Win' ? 'bold' : 'normal'}
+                            color={match.player2Result === 'Win' ? 'green.500' :
+                                   match.player2Result === 'Loss' ? 'red.500' : 'gray.500'}
+                          >
+                            {match.player2Score}
+                          </Text>
+                          <Text fontSize="xs" color="gray.500">{match.player2Result}</Text>
+                        </VStack>
+                      </Td>
+                      <Td textAlign="center">
+                        <Text fontSize="sm">
+                          {match.teamWhiteScore} - {match.teamBlueScore}
+                        </Text>
+                      </Td>
+                      <Td textAlign="center">
+                        <Tag
+                          size="sm"
+                          colorScheme={
+                            match.player1Result === 'Win' ? 'blue' :
+                            match.player2Result === 'Win' ? 'green' : 'gray'
+                          }
+                        >
+                          {match.player1Result === 'Win' ? comparisonData.player1!.name :
+                           match.player2Result === 'Win' ? comparisonData.player2!.name : 'Draw'}
+                        </Tag>
+                      </Td>
+                      <Td textAlign="center">
+                        <VStack spacing={0}>
+                          <Text
+                            fontSize="xs"
+                            color={match.player1EloChange >= 0 ? 'green.500' : 'red.500'}
+                          >
+                            {match.player1EloChange >= 0 ? '+' : ''}{Math.round(match.player1EloChange)}
+                          </Text>
+                          <Text
+                            fontSize="xs"
+                            color={match.player2EloChange >= 0 ? 'green.500' : 'red.500'}
+                          >
+                            {match.player2EloChange >= 0 ? '+' : ''}{Math.round(match.player2EloChange)}
+                          </Text>
+                        </VStack>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+              {opponentMatches.length > 10 && (
+                <Text fontSize="sm" color="gray.500" mt={2} textAlign="center">
+                  Showing latest 10 of {opponentMatches.length} opponent matches
+                </Text>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Team Performance (Teammates) Section */}
+        {teammateMatches.length > 0 && (
+          <Card bg={cardBg}>
+            <CardHeader>
+              <Heading size="md" color={textColor}>Playing Together (As Teammates)</Heading>
+              <HStack spacing={4} mt={2}>
+                <Stat size="sm">
+                  <StatLabel>Total Together</StatLabel>
+                  <StatNumber>{teammateMatches.length}</StatNumber>
+                </Stat>
+                <Stat size="sm">
+                  <StatLabel>Team Wins</StatLabel>
+                  <StatNumber color="green.500">{teamWins}</StatNumber>
+                </Stat>
+                <Stat size="sm">
+                  <StatLabel>Team Losses</StatLabel>
+                  <StatNumber color="red.500">{teamLosses}</StatNumber>
+                </Stat>
+                <Stat size="sm">
+                  <StatLabel>Team Draws</StatLabel>
+                  <StatNumber color="gray.500">{teamDraws}</StatNumber>
+                </Stat>
+                <Stat size="sm">
+                  <StatLabel>Win Rate</StatLabel>
+                  <StatNumber color="blue.500">
+                    {teammateMatches.length > 0 ? Math.round((teamWins / teammateMatches.length) * 100) : 0}%
+                  </StatNumber>
+                </Stat>
+              </HStack>
+            </CardHeader>
+            <CardBody>
+              <Table variant="simple" size="sm">
+                <Thead>
+                  <Tr>
+                    <Th>Date</Th>
+                    <Th textAlign="center">Team Score</Th>
+                    <Th textAlign="center">Opponent Score</Th>
+                    <Th textAlign="center">Result</Th>
+                    <Th textAlign="center">{comparisonData.player1!.name} Goals</Th>
+                    <Th textAlign="center">{comparisonData.player2!.name} Goals</Th>
+                    <Th textAlign="center">ELO Change</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {teammateMatches.slice(0, 10).map((match, index) => (
+                    <Tr key={index}>
+                      <Td>{new Date(match.date).toLocaleDateString()}</Td>
+                      <Td textAlign="center">
+                        <Text
+                          fontWeight="bold"
+                          color={match.player1Result === 'Win' ? 'green.500' :
+                                 match.player1Result === 'Loss' ? 'red.500' : 'gray.500'}
+                        >
+                          {match.player1Score}
+                        </Text>
+                      </Td>
+                      <Td textAlign="center">
+                        <Text
+                          fontWeight="bold"
+                          color={match.player1Result === 'Win' ? 'red.500' :
+                                 match.player1Result === 'Loss' ? 'green.500' : 'gray.500'}
+                        >
+                          {match.player2Score}
+                        </Text>
+                      </Td>
+                      <Td textAlign="center">
+                        <Tag
+                          size="sm"
+                          colorScheme={
+                            match.player1Result === 'Win' ? 'green' :
+                            match.player1Result === 'Loss' ? 'red' : 'gray'
+                          }
+                        >
+                          {match.player1Result === 'Win' ? 'Team Win' :
+                           match.player1Result === 'Loss' ? 'Team Loss' : 'Team Draw'}
+                        </Tag>
+                      </Td>
+                      <Td textAlign="center">
+                        <Text fontSize="sm">{match.player1Score}</Text>
+                      </Td>
+                      <Td textAlign="center">
+                        <Text fontSize="sm">{match.player2Score}</Text>
+                      </Td>
+                      <Td textAlign="center">
+                        <VStack spacing={0}>
+                          <Text
+                            fontSize="xs"
+                            color={match.player1EloChange >= 0 ? 'green.500' : 'red.500'}
+                          >
+                            {match.player1EloChange >= 0 ? '+' : ''}{Math.round(match.player1EloChange)}
+                          </Text>
+                          <Text
+                            fontSize="xs"
+                            color={match.player2EloChange >= 0 ? 'green.500' : 'red.500'}
+                          >
+                            {match.player2EloChange >= 0 ? '+' : ''}{Math.round(match.player2EloChange)}
+                          </Text>
+                        </VStack>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+              {teammateMatches.length > 10 && (
+                <Text fontSize="sm" color="gray.500" mt={2} textAlign="center">
+                  Showing latest 10 of {teammateMatches.length} teammate matches
+                </Text>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {/* No Data Message */}
+        {opponentMatches.length === 0 && teammateMatches.length === 0 && (
+          <Card bg={cardBg}>
+            <CardBody>
+              <Text textAlign="center" color="gray.500">
+                No head-to-head or teammate matches found between these players
+              </Text>
+            </CardBody>
+          </Card>
+        )}
+      </VStack>
     );
   };
 
