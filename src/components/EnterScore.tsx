@@ -182,7 +182,15 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
   };
 
   return (
-    <Box maxWidth="500px" mx="auto" mt={10} p={6} borderRadius="lg" boxShadow="md" bg="white">
+    <Box 
+      maxWidth={{ base: "100%", md: "500px" }} 
+      mx="auto" 
+      mt={{ base: 5, md: 10 }} 
+      p={{ base: 4, md: 6 }} 
+      borderRadius="lg" 
+      boxShadow="md" 
+      bg="white"
+    >
       <Flex align="center" mb={6}>
         <Heading as="h2" size="lg" textAlign="center" flex="1">Match result</Heading>
       </Flex>
@@ -202,7 +210,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
       )}
 
       <Box as="form" onSubmit={handleSubmit}>
-        <SimpleGrid columns={2} spacing={6} mb={6}>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={6}>
           <Box bg="white" borderWidth={'1px'} p={4} borderRadius="md">
             <Heading as="h3" size="md" mb={4} textAlign="center">Team White</Heading>
             <FormControl mb={3} isRequired>
@@ -333,7 +341,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
           <ModalBody>
             <Text fontWeight="bold" mb={4}>Are you sure you want to save this match result?</Text>
 
-            <SimpleGrid columns={2} spacing={4} mb={4}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
               <Box>
                 <Text fontWeight="semibold">Team 1</Text>
                 <Text>Defense: {getPlayerName(formData.team1Defense)}</Text>

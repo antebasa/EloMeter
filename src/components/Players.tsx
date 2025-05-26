@@ -455,7 +455,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     <Box p={{ base: 2, md: 5 }}>
       <Heading as="h1" size="xl" mb={6} textAlign="center" color={headingColor}>Player Rankings</Heading>
 
-      <InputGroup mb={6} size="lg">
+      <InputGroup mb={6} size={{ base: "md", md: "lg" }}>
         <InputLeftElement pointerEvents="none">
           <SearchIcon color={searchIconColor} />
         </InputLeftElement>
@@ -470,16 +470,16 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
       </InputGroup>
 
       <Tabs variant="soft-rounded" colorScheme="teal" onChange={handleTabChange} index={activeTab} isLazy>
-        <TabList mb={4} justifyContent="center">
-          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Offense Rankings</Tab>
-          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Defense Rankings</Tab>
-          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor}>Overall Rankings</Tab>
+        <TabList mb={4} justifyContent="center" flexWrap="wrap">
+          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor} fontSize={{ base: "sm", md: "md" }}>Offense Rankings</Tab>
+          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor} fontSize={{ base: "sm", md: "md" }}>Defense Rankings</Tab>
+          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor} fontSize={{ base: "sm", md: "md" }}>Overall Rankings</Tab>
         </TabList>
 
         <TabPanels>
           <TabPanel p={0}>
             <Box overflowX="auto">
-              <Table variant="simple" size="md" bg={tableBg} boxShadow="md" borderRadius="md">
+              <Table variant="simple" size={{ base: "sm", md: "md" }} bg={tableBg} boxShadow="md" borderRadius="md">
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
@@ -532,7 +532,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
 
           <TabPanel p={0}>
             <Box overflowX="auto">
-              <Table variant="simple" size="md" bg={tableBg} boxShadow="md" borderRadius="md">
+              <Table variant="simple" size={{ base: "sm", md: "md" }} bg={tableBg} boxShadow="md" borderRadius="md">
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
@@ -585,7 +585,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
 
           <TabPanel p={0}>
             <Box overflowX="auto">
-              <Table variant="simple" size="md" bg={tableBg} boxShadow="md" borderRadius="md">
+              <Table variant="simple" size={{ base: "sm", md: "md" }} bg={tableBg} boxShadow="md" borderRadius="md">
                 <Thead bg={headerBg}>
                   <Tr>
                     <Th cursor="pointer" onClick={() => handleSort('name')}>Name{renderSortIcon('name')}</Th>
