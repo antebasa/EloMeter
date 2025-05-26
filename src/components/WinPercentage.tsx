@@ -52,6 +52,14 @@ interface PlayerTeamStats {
   total_white_offense: number;
 }
 
+type SortKey = 'name' | 'wins' | 'total' | 'winPercentage';
+type SortDirection = 'ascending' | 'descending';
+
+interface SortConfig {
+  key: SortKey;
+  direction: SortDirection;
+}
+
 const positionColor = (position: number): string | undefined => {
   if (position === 0) return "#b5a64255"; // Gold
   else if (position === 1) return "#c0c0c0aa"; // Silver
@@ -64,6 +72,12 @@ export const WinPercentage: React.FC = () => {
   const [playerStats, setPlayerStats] = useState<PlayerTeamStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Separate sort configs for each table
+  const [blueDefenseSortConfig, setBlueDefenseSortConfig] = useState<SortConfig>({ key: 'wins', direction: 'descending' });
+  const [blueOffenseSortConfig, setBlueOffenseSortConfig] = useState<SortConfig>({ key: 'wins', direction: 'descending' });
+  const [whiteDefenseSortConfig, setWhiteDefenseSortConfig] = useState<SortConfig>({ key: 'wins', direction: 'descending' });
+  const [whiteOffenseSortConfig, setWhiteOffenseSortConfig] = useState<SortConfig>({ key: 'wins', direction: 'descending' });
 
   const cardBg = useColorModeValue('white', 'gray.700');
   const textColor = useColorModeValue('gray.600', 'gray.300');
@@ -253,6 +267,97 @@ export const WinPercentage: React.FC = () => {
     return ((wins / total) * 100).toFixed(2);
   };
 
+  const getSortConfig = (position: 'defense' | 'offense', teamColor: 'blue' | 'white'): SortConfig => {
+    if (teamColor === 'blue' && position === 'defense') return blueDefenseSortConfig;
+    if (teamColor === 'blue' && position === 'offense') return blueOffenseSortConfig;
+    if (teamColor === 'white' && position === 'defense') return whiteDefenseSortConfig;
+    return whiteOffenseSortConfig;
+  };
+
+  const setSortConfig = (position: 'defense' | 'offense', teamColor: 'blue' | 'white', config: SortConfig) => {
+    if (teamColor === 'blue' && position === 'defense') setBlueDefenseSortConfig(config);
+    else if (teamColor === 'blue' && position === 'offense') setBlueOffenseSortConfig(config);
+    else if (teamColor === 'white' && position === 'defense') setWhiteDefenseSortConfig(config);
+    else setWhiteOffenseSortConfig(config);
+  };
+
+  const handleSort = (key: SortKey, position: 'defense' | 'offense', teamColor: 'blue' | 'white') => {
+    const currentConfig = getSortConfig(position, teamColor);
+    let direction: SortDirection = 'ascending';
+    if (currentConfig.key === key && currentConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig(position, teamColor, { key, direction });
+  };
+
+  const sortPlayers = (players: PlayerTeamStats[], position: 'defense' | 'offense', teamColor: 'blue' | 'white'): PlayerTeamStats[] => {
+    const config = getSortConfig(position, teamColor);
+
+    return [...players].sort((a, b) => {
+      let aValue: any, bValue: any;
+
+      switch (config.key) {
+        case 'name':
+          aValue = a.name;
+          bValue = b.name;
+          break;
+        case 'wins':
+          aValue = teamColor === 'blue'
+            ? (position === 'defense' ? a.wins_as_blue_defense : a.wins_as_blue_offense)
+            : (position === 'defense' ? a.wins_as_white_defense : a.wins_as_white_offense);
+          bValue = teamColor === 'blue'
+            ? (position === 'defense' ? b.wins_as_blue_defense : b.wins_as_blue_offense)
+            : (position === 'defense' ? b.wins_as_white_defense : b.wins_as_white_offense);
+          break;
+        case 'total':
+          aValue = teamColor === 'blue'
+            ? (position === 'defense' ? a.total_blue_defense : a.total_blue_offense)
+            : (position === 'defense' ? a.total_white_defense : a.total_white_offense);
+          bValue = teamColor === 'blue'
+            ? (position === 'defense' ? b.total_blue_defense : b.total_blue_offense)
+            : (position === 'defense' ? b.total_white_defense : b.total_white_offense);
+          break;
+        case 'winPercentage':
+          const aWins = teamColor === 'blue'
+            ? (position === 'defense' ? a.wins_as_blue_defense : a.wins_as_blue_offense)
+            : (position === 'defense' ? a.wins_as_white_defense : a.wins_as_white_offense);
+          const aTotal = teamColor === 'blue'
+            ? (position === 'defense' ? a.total_blue_defense : a.total_blue_offense)
+            : (position === 'defense' ? a.total_white_defense : a.total_white_offense);
+          const bWins = teamColor === 'blue'
+            ? (position === 'defense' ? b.wins_as_blue_defense : b.wins_as_blue_offense)
+            : (position === 'defense' ? b.wins_as_white_defense : b.wins_as_white_offense);
+          const bTotal = teamColor === 'blue'
+            ? (position === 'defense' ? b.total_blue_defense : b.total_blue_offense)
+            : (position === 'defense' ? b.total_white_defense : b.total_white_offense);
+          aValue = aTotal > 0 ? (aWins / aTotal) * 100 : 0;
+          bValue = bTotal > 0 ? (bWins / bTotal) * 100 : 0;
+          break;
+        default:
+          aValue = 0;
+          bValue = 0;
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return config.direction === 'ascending'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      if (config.direction === 'ascending') {
+        return aValue - bValue;
+      } else {
+        return bValue - aValue;
+      }
+    });
+  };
+
+  const renderSortIcon = (key: SortKey, position: 'defense' | 'offense', teamColor: 'blue' | 'white') => {
+    const config = getSortConfig(position, teamColor);
+    if (config.key !== key) return null;
+    return config.direction === 'ascending' ? ' ↑' : ' ↓';
+  };
+
   const renderPlayerTable = (players: PlayerTeamStats[], position: 'defense' | 'offense', teamColor: 'blue' | 'white') => {
     const filteredPlayers = players.filter(player => {
       const total = teamColor === 'blue'
@@ -261,16 +366,8 @@ export const WinPercentage: React.FC = () => {
       return total > 0;
     });
 
-    // Sort players by wins (default sorting)
-    const sortedPlayers = [...filteredPlayers].sort((a, b) => {
-      const aWins = teamColor === 'blue'
-        ? (position === 'defense' ? a.wins_as_blue_defense : a.wins_as_blue_offense)
-        : (position === 'defense' ? a.wins_as_white_defense : a.wins_as_white_offense);
-      const bWins = teamColor === 'blue'
-        ? (position === 'defense' ? b.wins_as_blue_defense : b.wins_as_blue_offense)
-        : (position === 'defense' ? b.wins_as_white_defense : b.wins_as_white_offense);
-      return bWins - aWins;
-    });
+    // Sort players using the current sort configuration
+    const sortedPlayers = sortPlayers(filteredPlayers, position, teamColor);
 
     const colorScheme = teamColor === 'blue' ? 'blue' : 'gray';
     const headerColor = teamColor === 'blue' ? 'blue.400' : 'gray.500';
@@ -286,17 +383,17 @@ export const WinPercentage: React.FC = () => {
           <Table size="sm" variant="simple" bg={tableBg} borderRadius="md">
             <Thead bg={headerBg}>
               <Tr>
-                <Th color={textColor}>
-                  Player
+                <Th color={textColor} cursor="pointer" onClick={() => handleSort('name', position, teamColor)}>
+                  Player{renderSortIcon('name', position, teamColor)}
                 </Th>
-                <Th color={textColor} isNumeric>
-                  Wins
+                <Th color={textColor} isNumeric cursor="pointer" onClick={() => handleSort('wins', position, teamColor)}>
+                  Wins{renderSortIcon('wins', position, teamColor)}
                 </Th>
-                <Th color={textColor} isNumeric>
-                  Total
+                <Th color={textColor} isNumeric cursor="pointer" onClick={() => handleSort('total', position, teamColor)}>
+                  Total{renderSortIcon('total', position, teamColor)}
                 </Th>
-                <Th color={textColor} isNumeric>
-                  Win %
+                <Th color={textColor} isNumeric cursor="pointer" onClick={() => handleSort('winPercentage', position, teamColor)}>
+                  Win %{renderSortIcon('winPercentage', position, teamColor)}
                 </Th>
               </Tr>
             </Thead>
@@ -510,7 +607,6 @@ export const WinPercentage: React.FC = () => {
                 <HStack justify="space-between" mt={2} fontSize="sm" color={textColor}>
                   <Text>Blue: {stats.blue_percentage}%</Text>
                   <Text>White: {stats.white_percentage}%</Text>
-                  <Text>Unfinished: {Math.round((100 - stats.blue_percentage - stats.white_percentage) * 100) / 100}%</Text>
                 </HStack>
               </Box>
             )}
