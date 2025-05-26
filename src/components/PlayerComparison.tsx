@@ -34,6 +34,9 @@ import {
   Th,
   Td,
   Tag,
+  Switch,
+  FormControl,
+  FormLabel,
 } from '@chakra-ui/react';
 import {
   BarChart,
@@ -107,6 +110,8 @@ export const PlayerComparison: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showOffenseElo, setShowOffenseElo] = useState(true);
+  const [showDefenseElo, setShowDefenseElo] = useState(true);
 
   const cardBg = useColorModeValue('white', 'gray.700');
   const textColor = useColorModeValue('gray.800', 'whiteAlpha.900');
@@ -553,7 +558,33 @@ export const PlayerComparison: React.FC = () => {
     return (
       <Card bg={cardBg}>
         <CardHeader>
-          <Heading size="md" color={textColor}>ELO History Comparison</Heading>
+          <Flex justify="space-between" align="center" mb={4}>
+            <Heading size="md" color={textColor}>ELO History Comparison</Heading>
+            <HStack spacing={6}>
+              <FormControl display="flex" alignItems="center">
+                <FormLabel htmlFor="offense-toggle" mb="0" fontSize="sm">
+                  Offense ELO
+                </FormLabel>
+                <Switch
+                  id="offense-toggle"
+                  isChecked={showOffenseElo}
+                  onChange={(e) => setShowOffenseElo(e.target.checked)}
+                  colorScheme="blue"
+                />
+              </FormControl>
+              <FormControl display="flex" alignItems="center">
+                <FormLabel htmlFor="defense-toggle" mb="0" fontSize="sm">
+                  Defense ELO
+                </FormLabel>
+                <Switch
+                  id="defense-toggle"
+                  isChecked={showDefenseElo}
+                  onChange={(e) => setShowDefenseElo(e.target.checked)}
+                  colorScheme="green"
+                />
+              </FormControl>
+            </HStack>
+          </Flex>
         </CardHeader>
         <CardBody>
           <ResponsiveContainer width="100%" height={400}>
@@ -576,34 +607,42 @@ export const PlayerComparison: React.FC = () => {
                 formatter={(value: any, name: any) => [Math.round(value), name]}
               />
               <Legend />
-              <Line
-                type="monotone"
-                dataKey={`${comparisonData.player1!.name}_offense`}
-                stroke="#3182CE"
-                name={`${comparisonData.player1!.name} (Offense)`}
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey={`${comparisonData.player1!.name}_defense`}
-                stroke="#38A169"
-                name={`${comparisonData.player1!.name} (Defense)`}
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey={`${comparisonData.player2!.name}_offense`}
-                stroke="#D69E2E"
-                name={`${comparisonData.player2!.name} (Offense)`}
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey={`${comparisonData.player2!.name}_defense`}
-                stroke="#E53E3E"
-                name={`${comparisonData.player2!.name} (Defense)`}
-                strokeWidth={2}
-              />
+              {showOffenseElo && (
+                <Line
+                  type="monotone"
+                  dataKey={`${comparisonData.player1!.name}_offense`}
+                  stroke="#3182CE"
+                  name={`${comparisonData.player1!.name} (Offense)`}
+                  strokeWidth={2}
+                />
+              )}
+              {showDefenseElo && (
+                <Line
+                  type="monotone"
+                  dataKey={`${comparisonData.player1!.name}_defense`}
+                  stroke="#38A169"
+                  name={`${comparisonData.player1!.name} (Defense)`}
+                  strokeWidth={2}
+                />
+              )}
+              {showOffenseElo && (
+                <Line
+                  type="monotone"
+                  dataKey={`${comparisonData.player2!.name}_offense`}
+                  stroke="#D69E2E"
+                  name={`${comparisonData.player2!.name} (Offense)`}
+                  strokeWidth={2}
+                />
+              )}
+              {showDefenseElo && (
+                <Line
+                  type="monotone"
+                  dataKey={`${comparisonData.player2!.name}_defense`}
+                  stroke="#E53E3E"
+                  name={`${comparisonData.player2!.name} (Defense)`}
+                  strokeWidth={2}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </CardBody>
