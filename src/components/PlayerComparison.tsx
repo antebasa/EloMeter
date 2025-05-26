@@ -139,7 +139,6 @@ export const PlayerComparison: React.FC = () => {
 
     // Calculate recent form (last 10 matches)
     const recentMatches = matchHistory.slice(0, 10);
-    const recentWins = recentMatches.filter(match => match.result === 'Win').length;
 
     return {
       ...player,
