@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {
   Alert,
   AlertIcon,
@@ -437,9 +437,9 @@ export const WinPercentage = () => {
                             mr={{ base: 1, md: 2 }}
                             src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined}
                           />
-                          <Text 
-                            color={playerNameColor} 
-                            fontSize={{ base: "xs", md: "sm" }} 
+                          <Text
+                            color={playerNameColor}
+                            fontSize={{ base: "xs", md: "sm" }}
                             fontWeight="medium"
                             noOfLines={1}
                             maxW={{ base: "60px", md: "auto" }}
