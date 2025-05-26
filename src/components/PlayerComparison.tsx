@@ -870,6 +870,39 @@ export const PlayerComparison: React.FC = () => {
                   </StatNumber>
                 </Stat>
               </HStack>
+              
+              {/* Role Distribution Summary */}
+              <Box mt={4} p={3} bg="gray.50" borderRadius="md">
+                <Text fontSize="sm" fontWeight="semibold" mb={2} color="gray.700">Role Distribution:</Text>
+                <Grid templateColumns="repeat(2, 1fr)" gap={4}>
+                  <Box>
+                    <Text fontSize="sm" fontWeight="medium" color="blue.600">
+                      {comparisonData.player1!.name}:
+                    </Text>
+                    <HStack spacing={2} mt={1}>
+                      <Badge colorScheme="blue" size="sm">
+                        Defense: {teammateMatches.filter(m => m.defensivePlayer === comparisonData.player1!.name).length}
+                      </Badge>
+                      <Badge colorScheme="orange" size="sm">
+                        Offense: {teammateMatches.filter(m => m.offensivePlayer === comparisonData.player1!.name).length}
+                      </Badge>
+                    </HStack>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" fontWeight="medium" color="green.600">
+                      {comparisonData.player2!.name}:
+                    </Text>
+                    <HStack spacing={2} mt={1}>
+                      <Badge colorScheme="blue" size="sm">
+                        Defense: {teammateMatches.filter(m => m.defensivePlayer === comparisonData.player2!.name).length}
+                      </Badge>
+                      <Badge colorScheme="orange" size="sm">
+                        Offense: {teammateMatches.filter(m => m.offensivePlayer === comparisonData.player2!.name).length}
+                      </Badge>
+                    </HStack>
+                  </Box>
+                </Grid>
+              </Box>
             </CardHeader>
             <CardBody>
               <Table variant="simple" size="sm">
@@ -879,6 +912,8 @@ export const PlayerComparison: React.FC = () => {
                     <Th textAlign="center">Team Score</Th>
                     <Th textAlign="center">Opponent Score</Th>
                     <Th textAlign="center">Result</Th>
+                    <Th textAlign="center">Defense</Th>
+                    <Th textAlign="center">Offense</Th>
                     <Th textAlign="center">Opponents</Th>
                     <Th textAlign="center">ELO Change</Th>
                   </Tr>
@@ -916,6 +951,46 @@ export const PlayerComparison: React.FC = () => {
                           >
                             {teamWon ? 'Team Win' : 'Team Loss'}
                           </Tag>
+                        </Td>
+                        <Td textAlign="center">
+                          <VStack spacing={0}>
+                            <Text 
+                              fontSize="sm" 
+                              fontWeight="semibold" 
+                              color="blue.600"
+                              bg={match.defensivePlayer === comparisonData.player1!.name ? 'blue.50' : 
+                                  match.defensivePlayer === comparisonData.player2!.name ? 'green.50' : 'transparent'}
+                              px={2}
+                              py={1}
+                              borderRadius="md"
+                            >
+                              {match.defensivePlayer || 'Unknown'}
+                            </Text>
+                            {(match.defensivePlayer === comparisonData.player1!.name || 
+                              match.defensivePlayer === comparisonData.player2!.name) && (
+                              <Badge size="xs" colorScheme="blue">DEF</Badge>
+                            )}
+                          </VStack>
+                        </Td>
+                        <Td textAlign="center">
+                          <VStack spacing={0}>
+                            <Text 
+                              fontSize="sm" 
+                              fontWeight="semibold" 
+                              color="orange.600"
+                              bg={match.offensivePlayer === comparisonData.player1!.name ? 'blue.50' : 
+                                  match.offensivePlayer === comparisonData.player2!.name ? 'green.50' : 'transparent'}
+                              px={2}
+                              py={1}
+                              borderRadius="md"
+                            >
+                              {match.offensivePlayer || 'Unknown'}
+                            </Text>
+                            {(match.offensivePlayer === comparisonData.player1!.name || 
+                              match.offensivePlayer === comparisonData.player2!.name) && (
+                              <Badge size="xs" colorScheme="orange">OFF</Badge>
+                            )}
+                          </VStack>
                         </Td>
                         <Td textAlign="center">
                           <Text fontSize="sm" color="gray.600">

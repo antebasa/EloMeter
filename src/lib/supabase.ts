@@ -822,6 +822,17 @@ export async function getHeadToHeadMatches(
       // Determine if they were teammates or opponents
       const sameTeam = p1Match.team_id.id === p2Match.team_id.id;
       
+      // Get team details for role information
+      const teamDetails = teamMap[p1Match.team_id.id];
+      let defensivePlayer = 'Unknown';
+      let offensivePlayer = 'Unknown';
+      
+      if (sameTeam && teamDetails) {
+        // Both players on same team - get their roles
+        defensivePlayer = userMap[teamDetails.player_defense_id] || 'Unknown';
+        offensivePlayer = userMap[teamDetails.player_offense_id] || 'Unknown';
+      }
+      
       // Determine team results based on actual team scores (not individual scores)
       let player1Result: string;
       let player2Result: string;
@@ -890,6 +901,8 @@ export async function getHeadToHeadMatches(
         teamWhiteScore: matchDetails.team_white_score,
         teamBlueScore: matchDetails.team_blue_score,
         opponents,
+        defensivePlayer,
+        offensivePlayer,
         player1EloChange: p1Match.new_elo !== p1Match.old_elo ? 
           p1Match.new_elo - p1Match.old_elo : 
           p1Match.new_elo_offense - p1Match.old_elo_offense,
