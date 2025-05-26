@@ -879,8 +879,7 @@ export const PlayerComparison: React.FC = () => {
                     <Th textAlign="center">Team Score</Th>
                     <Th textAlign="center">Opponent Score</Th>
                     <Th textAlign="center">Result</Th>
-                    <Th textAlign="center">{comparisonData.player1!.name} Goals</Th>
-                    <Th textAlign="center">{comparisonData.player2!.name} Goals</Th>
+                    <Th textAlign="center">Opponents</Th>
                     <Th textAlign="center">ELO Change</Th>
                   </Tr>
                 </Thead>
@@ -919,10 +918,9 @@ export const PlayerComparison: React.FC = () => {
                           </Tag>
                         </Td>
                         <Td textAlign="center">
-                          <Text fontSize="sm">{match.player1Score}</Text>
-                        </Td>
-                        <Td textAlign="center">
-                          <Text fontSize="sm">{match.player2Score}</Text>
+                          <Text fontSize="sm" color="gray.600">
+                            {match.opponents}
+                          </Text>
                         </Td>
                         <Td textAlign="center">
                           <VStack spacing={0}>

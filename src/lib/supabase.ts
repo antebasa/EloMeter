@@ -767,11 +767,40 @@ export async function getHeadToHeadMatches(
       player1MatchIds.has(p2Match.match_id.id)
     ) || [];
 
+    // Get all unique team IDs to fetch team details for opponent information
+    const allTeamIds = new Set<number>();
+    commonMatches.forEach(match => {
+      allTeamIds.add(match.match_id.white_team_id);
+      allTeamIds.add(match.match_id.blue_team_id);
+    });
+
+    // Fetch team details for opponent information
+    const { data: teams, error: teamsError } = await supabase
+      .from('Team')
+      .select('id, player_defense_id, player_offense_id, name')
+      .in('id', Array.from(allTeamIds));
+
+    if (teamsError) throw teamsError;
+
+    const teamMap = teams?.reduce((acc, team) => {
+      acc[team.id] = team;
+      return acc;
+    }, {} as Record<number, any>) || {};
+
+    // Get all unique user IDs for opponent names
+    const allUserIds = new Set<number>();
+    Object.values(teamMap).forEach((team: any) => {
+      if (team.player_defense_id) allUserIds.add(team.player_defense_id);
+      if (team.player_offense_id) allUserIds.add(team.player_offense_id);
+    });
+    allUserIds.add(player1Id);
+    allUserIds.add(player2Id);
+
     // Get user names for display
     const { data: users, error: usersError } = await supabase
       .from('User')
       .select('id, name')
-      .in('id', [player1Id, player2Id]);
+      .in('id', Array.from(allUserIds));
 
     if (usersError) throw usersError;
 
@@ -793,6 +822,61 @@ export async function getHeadToHeadMatches(
       // Determine if they were teammates or opponents
       const sameTeam = p1Match.team_id.id === p2Match.team_id.id;
       
+      // Determine team results based on actual team scores (not individual scores)
+      let player1Result: string;
+      let player2Result: string;
+      
+      if (sameTeam) {
+        // Both players on same team - use team score vs opponent team score
+        const theirTeamId = p1Match.team_id.id;
+        const isWhiteTeam = matchDetails.white_team_id === theirTeamId;
+        const theirTeamScore = isWhiteTeam ? matchDetails.team_white_score : matchDetails.team_blue_score;
+        const opponentTeamScore = isWhiteTeam ? matchDetails.team_blue_score : matchDetails.team_white_score;
+        
+        if (theirTeamScore > opponentTeamScore) {
+          player1Result = 'Win';
+          player2Result = 'Win';
+        } else {
+          player1Result = 'Loss';
+          player2Result = 'Loss';
+        }
+      } else {
+        // Players on different teams - use team scores
+        const player1TeamId = p1Match.team_id.id;
+        const player2TeamId = p2Match.team_id.id;
+        
+        const player1IsWhite = matchDetails.white_team_id === player1TeamId;
+        const player1TeamScore = player1IsWhite ? matchDetails.team_white_score : matchDetails.team_blue_score;
+        const player2TeamScore = player1IsWhite ? matchDetails.team_blue_score : matchDetails.team_white_score;
+        
+        if (player1TeamScore > player2TeamScore) {
+          player1Result = 'Win';
+          player2Result = 'Loss';
+        } else {
+          player1Result = 'Loss';
+          player2Result = 'Win';
+        }
+      }
+
+      // Get opponent information
+      let opponents = 'Unknown';
+      if (sameTeam) {
+        // Find the opposing team
+        const theirTeamId = p1Match.team_id.id;
+        const opponentTeamId = matchDetails.white_team_id === theirTeamId ? 
+          matchDetails.blue_team_id : matchDetails.white_team_id;
+        
+        const opponentTeam = teamMap[opponentTeamId];
+        if (opponentTeam) {
+          const oppDefName = userMap[opponentTeam.player_defense_id] || 'Unknown';
+          const oppOffName = userMap[opponentTeam.player_offense_id] || 'Unknown';
+          opponents = `${oppDefName} & ${oppOffName}`;
+        }
+      } else {
+        // They were opponents, so show each other
+        opponents = `vs ${userMap[player1Id]} & ${userMap[player2Id]}`;
+      }
+      
       return {
         id: matchDetails.id,
         date: matchDetails.created_at,
@@ -800,11 +884,12 @@ export async function getHeadToHeadMatches(
         player2Name: userMap[player2Id] || 'Player 2',
         player1Score,
         player2Score,
-        player1Result: player1Score > player2Score ? 'Win' : (player1Score === player2Score ? 'Draw' : 'Loss'),
-        player2Result: player2Score > player1Score ? 'Win' : (player2Score === player1Score ? 'Draw' : 'Loss'),
+        player1Result,
+        player2Result,
         sameTeam,
         teamWhiteScore: matchDetails.team_white_score,
         teamBlueScore: matchDetails.team_blue_score,
+        opponents,
         player1EloChange: p1Match.new_elo !== p1Match.old_elo ? 
           p1Match.new_elo - p1Match.old_elo : 
           p1Match.new_elo_offense - p1Match.old_elo_offense,
