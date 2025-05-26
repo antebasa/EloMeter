@@ -11,6 +11,7 @@ import {TeamSelection} from '../components/OptimalTeams';
 import {Players} from '../components/Players';
 import {AddPlayer} from '../components/AddPlayer';
 import {WinPercentage} from '../components/WinPercentage';
+import {PlayerComparison} from '../components/PlayerComparison';
 import type {MatchData} from "../lib/supabase"; // Assuming supabase.ts exports this type
 
 const DashboardPage: React.FC = () => {
@@ -61,6 +62,8 @@ const DashboardPage: React.FC = () => {
                 }
             case 'WinPercentage':
                 return <WinPercentage />;
+            case 'PlayerComparison':
+                return <PlayerComparison />;
             default:
                 return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
         }

@@ -1,34 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
+  Alert,
+  AlertIcon,
+  Avatar,
+  Badge,
   Box,
   Card,
   CardBody,
   CardHeader,
   Flex,
   Heading,
+  HStack,
+  Progress,
+  SimpleGrid,
   Spinner,
   Stat,
+  StatHelpText,
   StatLabel,
   StatNumber,
-  StatHelpText,
-  SimpleGrid,
-  Text,
-  Alert,
-  AlertIcon,
-  Progress,
-  VStack,
-  HStack,
-  Badge,
-  useColorModeValue,
   Table,
-  Thead,
   Tbody,
-  Tr,
-  Th,
   Td,
-  Avatar
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useColorModeValue,
+  VStack
 } from '@chakra-ui/react';
-import { supabase } from '../supabaseClient';
+import {supabase} from '../supabaseClient';
 
 interface WinPercentageStats {
   blue_wins: number;
@@ -422,7 +422,7 @@ export const WinPercentage: React.FC = () => {
                           size="xs"
                           name={player.name}
                           mr={2}
-                          src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/${player.avatar_url}` : undefined}
+                          src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined}
                         />
                         <Text color={playerNameColor} fontSize="sm" fontWeight="medium">
                           {player.name}
