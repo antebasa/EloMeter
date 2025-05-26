@@ -369,7 +369,6 @@ export const WinPercentage: React.FC = () => {
     // Sort players using the current sort configuration
     const sortedPlayers = sortPlayers(filteredPlayers, position, teamColor);
 
-    const colorScheme = teamColor === 'blue' ? 'blue' : 'gray';
     const headerColor = teamColor === 'blue' ? 'blue.400' : 'gray.500';
 
     return (
