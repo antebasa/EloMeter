@@ -19,6 +19,7 @@ import {
   Heading,
   HStack,
   Select,
+  SimpleGrid,
   Spinner,
   Stat,
   StatLabel,
@@ -219,43 +220,57 @@ export const PlayerComparison: React.FC = () => {
   };
 
   const renderPlayerCard = (player: PlayerWithStats, playerNumber: number) => {
-    const isPlayer1 = playerNumber === 1;
-    const cardColor = isPlayer1 ? 'blue.500' : 'green.500';
-
+    const cardColor = playerNumber === 1 ? 'blue.500' : 'green.500';
+    
     return (
-      <Card bg={cardBg} borderColor={cardColor} borderWidth="2px">
-        <CardHeader>
-          <Flex align="center" gap={4}>
-            <Avatar name={player.name} size="lg" />
-            <VStack align="start" spacing={1}>
-              <Heading size="md" color={textColor}>{player.name}</Heading>
-              <Badge colorScheme={isPlayer1 ? 'blue' : 'green'}>
-                Player {playerNumber}
-              </Badge>
-            </VStack>
+      <Card bg={cardBg} borderTop={`4px solid`} borderTopColor={cardColor}>
+        <CardHeader pb={2}>
+          <Flex align="center" justify="space-between" direction={{ base: "column", sm: "row" }} gap={{ base: 2, sm: 0 }}>
+            <HStack spacing={3}>
+              <Avatar 
+                size={{ base: "md", md: "lg" }} 
+                name={player.name} 
+                src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${player.avatar_url}` : undefined}
+              />
+              <VStack align="start" spacing={0}>
+                <Heading size={{ base: "sm", md: "md" }} color={cardColor}>{player.name}</Heading>
+                <Text fontSize={{ base: "xs", md: "sm" }} color="gray.500">Player {playerNumber}</Text>
+              </VStack>
+            </HStack>
+            <Badge colorScheme={playerNumber === 1 ? 'blue' : 'green'} fontSize={{ base: "xs", md: "sm" }}>
+              Overall: {player.elo_overall || 1400}
+            </Badge>
           </Flex>
         </CardHeader>
-        <CardBody>
-          <Grid templateColumns="repeat(2, 1fr)" gap={4}>
+        <CardBody pt={0}>
+          <SimpleGrid columns={{ base: 2, md: 3 }} spacing={{ base: 2, md: 4 }}>
             <Stat>
-              <StatLabel>Overall ELO</StatLabel>
-              <StatNumber>{player.elo_overall}</StatNumber>
+              <StatLabel fontSize={{ base: "xs", md: "sm" }}>Offense ELO</StatLabel>
+              <StatNumber fontSize={{ base: "md", md: "lg" }} color="purple.500">{player.elo_offense || 1400}</StatNumber>
             </Stat>
             <Stat>
-              <StatLabel>Win Rate</StatLabel>
-              <StatNumber>{player.winPercentage}%</StatNumber>
+              <StatLabel fontSize={{ base: "xs", md: "sm" }}>Defense ELO</StatLabel>
+              <StatNumber fontSize={{ base: "md", md: "lg" }} color="blue.500">{player.elo_defense || 1400}</StatNumber>
             </Stat>
             <Stat>
-              <StatLabel>Matches Played</StatLabel>
-              <StatNumber>{player.played || 0}</StatNumber>
+              <StatLabel fontSize={{ base: "xs", md: "sm" }}>Win Rate</StatLabel>
+              <StatNumber fontSize={{ base: "md", md: "lg" }} color="green.500">{player.winPercentage}%</StatNumber>
             </Stat>
             <Stat>
-              <StatLabel>Goal Difference</StatLabel>
-              <StatNumber color={player.goalDifference! >= 0 ? 'green.500' : 'red.500'}>
-                {player.goalDifference! >= 0 ? '+' : ''}{player.goalDifference}
+              <StatLabel fontSize={{ base: "xs", md: "sm" }}>Goals</StatLabel>
+              <StatNumber fontSize={{ base: "md", md: "lg" }}>{player.scored || 0}</StatNumber>
+            </Stat>
+            <Stat>
+              <StatLabel fontSize={{ base: "xs", md: "sm" }}>Matches</StatLabel>
+              <StatNumber fontSize={{ base: "md", md: "lg" }}>{player.played || 0}</StatNumber>
+            </Stat>
+            <Stat>
+              <StatLabel fontSize={{ base: "xs", md: "sm" }}>Goal Diff</StatLabel>
+              <StatNumber fontSize={{ base: "md", md: "lg" }} color={player.goalDifference && player.goalDifference > 0 ? 'green.500' : 'red.500'}>
+                {player.goalDifference || 0 > 0 ? '+' : ''}{player.goalDifference || 0}
               </StatNumber>
             </Stat>
-          </Grid>
+          </SimpleGrid>
         </CardBody>
       </Card>
     );
@@ -1031,19 +1046,19 @@ export const PlayerComparison: React.FC = () => {
   };
 
   return (
-    <Box p={6}>
-      <VStack spacing={6} align="stretch">
-        <Heading size="lg" color={'white'} textAlign="center">
+    <Box p={{ base: 4, md: 6 }}>
+      <VStack spacing={{ base: 4, md: 6 }} align="stretch">
+        <Heading size={{ base: "md", md: "lg" }} textAlign="center" color="white">
           Player Comparison
         </Heading>
 
         {/* Player Selection */}
         <Card bg={cardBg}>
           <CardHeader>
-            <Heading size="md" color={textColor}>Select Players to Compare</Heading>
+            <Heading size={{ base: "sm", md: "md" }} color={textColor}>Select Players to Compare</Heading>
           </CardHeader>
           <CardBody>
-            <Grid templateColumns="repeat(3, 1fr)" gap={4} alignItems="end">
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={{ base: 4, md: 6 }}>
               <Box>
                 <Text mb={2} color={textColor}>Player 1</Text>
                 <Select
@@ -1081,7 +1096,7 @@ export const PlayerComparison: React.FC = () => {
               >
                 Compare Players
               </Button>
-            </Grid>
+            </SimpleGrid>
           </CardBody>
         </Card>
 

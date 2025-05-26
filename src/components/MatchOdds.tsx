@@ -293,21 +293,21 @@ export const MatchOdds = () => {
     if (!prediction) return null;
     return (
       <Card bg={cardBg} shadow="md" variant="outline" mb={6}>
-        <CardHeader><Heading size="md" color={headingColor}>ELO Based Prediction (Overall)</Heading></CardHeader>
+        <CardHeader><Heading size={{ base: "sm", md: "md" }} color={headingColor}>ELO Based Prediction (Overall)</Heading></CardHeader>
         <CardBody>
-          <Flex justify="space-around" mb={4} direction={{base: "column", md: "row"}}>
+          <Flex justify="space-around" mb={4} direction={{ base: "column", md: "row" }} gap={{ base: 4, md: 0 }}>
             <Stat textAlign="center" p={2}>
-              <StatLabel>{prediction.team1Name}</StatLabel>
-              <StatNumber color="blue.500">{prediction.team1Probability}%</StatNumber>
-              <StatHelpText>Team ELO: {prediction.team1BaseElo}</StatHelpText>
+              <StatLabel fontSize={{ base: "sm", md: "md" }}>{prediction.team1Name}</StatLabel>
+              <StatNumber color="blue.500" fontSize={{ base: "lg", md: "xl" }}>{prediction.team1Probability}%</StatNumber>
+              <StatHelpText fontSize={{ base: "xs", md: "sm" }}>Team ELO: {prediction.team1BaseElo}</StatHelpText>
             </Stat>
             <Stat textAlign="center" p={2}>
-              <StatLabel>{prediction.team2Name}</StatLabel>
-              <StatNumber color="orange.500">{prediction.team2Probability}%</StatNumber>
-              <StatHelpText>Team ELO: {prediction.team2BaseElo}</StatHelpText>
+              <StatLabel fontSize={{ base: "sm", md: "md" }}>{prediction.team2Name}</StatLabel>
+              <StatNumber color="orange.500" fontSize={{ base: "lg", md: "xl" }}>{prediction.team2Probability}%</StatNumber>
+              <StatHelpText fontSize={{ base: "xs", md: "sm" }}>Team ELO: {prediction.team2BaseElo}</StatHelpText>
             </Stat>
           </Flex>
-          <Text textAlign="center" fontWeight="bold" fontSize="lg">
+          <Text textAlign="center" fontWeight="bold" fontSize={{ base: "md", md: "lg" }}>
             Predicted Score: {prediction.predictedScore.team1} - {prediction.predictedScore.team2}
           </Text>
         </CardBody>
@@ -318,25 +318,25 @@ export const MatchOdds = () => {
   const renderHistoricalPrediction = (prediction: HistoricalPredictionScenario) => {
     return (
       <Card key={prediction.scenarioTitle} bg={cardBg} shadow="md" variant="outline" mb={6}>
-        <CardHeader><Heading size="md" color={headingColor}>{prediction.scenarioTitle}</Heading></CardHeader>
+        <CardHeader><Heading size={{ base: "sm", md: "md" }} color={headingColor}>{prediction.scenarioTitle}</Heading></CardHeader>
         <CardBody>
-          <Text fontSize="sm" mb={1}>Record: {prediction.historicalWins}W - {prediction.historicalLosses}L - {prediction.historicalDraws}D (Total: {prediction.totalPlayed})</Text>
-          <Flex justify="space-around" mb={4} direction={{base: "column", md: "row"}}>
+          <Text fontSize={{ base: "xs", md: "sm" }} mb={1}>Record: {prediction.historicalWins}W - {prediction.historicalLosses}L - {prediction.historicalDraws}D (Total: {prediction.totalPlayed})</Text>
+          <Flex justify="space-around" mb={4} direction={{ base: "column", md: "row" }} gap={{ base: 4, md: 0 }}>
              <Stat textAlign="center" p={2}>
-              <StatLabel>{prediction.teamName}</StatLabel>
-              <StatNumber color="blue.500">{prediction.winProbability}%</StatNumber>
-              <StatHelpText>Win Chance</StatHelpText>
+              <StatLabel fontSize={{ base: "sm", md: "md" }}>{prediction.teamName}</StatLabel>
+              <StatNumber color="blue.500" fontSize={{ base: "lg", md: "xl" }}>{prediction.winProbability}%</StatNumber>
+              <StatHelpText fontSize={{ base: "xs", md: "sm" }}>Win Chance</StatHelpText>
             </Stat>
             <Stat textAlign="center" p={2}>
-              <StatLabel>{prediction.opponentName}</StatLabel>
-              <StatNumber color="orange.500">{100 - prediction.winProbability}%</StatNumber>
-              <StatHelpText>Win Chance</StatHelpText>
+              <StatLabel fontSize={{ base: "sm", md: "md" }}>{prediction.opponentName}</StatLabel>
+              <StatNumber color="orange.500" fontSize={{ base: "lg", md: "xl" }}>{100 - prediction.winProbability}%</StatNumber>
+              <StatHelpText fontSize={{ base: "xs", md: "sm" }}>Win Chance</StatHelpText>
             </Stat>
           </Flex>
-          <Text textAlign="center" fontWeight="bold" fontSize="lg">
+          <Text textAlign="center" fontWeight="bold" fontSize={{ base: "md", md: "lg" }}>
             Predicted Score: {prediction.predictedScore.team1} - {prediction.predictedScore.team2}
           </Text>
-           {prediction.totalPlayed === 0 && <Text textAlign="center" fontSize="sm" color="gray.500" mt={2}>No historical matches found for this specific color configuration.</Text>}
+           {prediction.totalPlayed === 0 && <Text textAlign="center" fontSize={{ base: "xs", md: "sm" }} color="gray.500" mt={2}>No historical matches found for this specific color configuration.</Text>}
         </CardBody>
       </Card>
     );
@@ -353,8 +353,8 @@ export const MatchOdds = () => {
 
 
   return (
-    <Box maxWidth="1000px" mx="auto" p={6} >
-      <Heading as="h2" size="xl" mb={6} textAlign="center" color={headingColor}>Match Predictor</Heading>
+    <Box maxWidth={{ base: "100%", md: "1000px" }} mx="auto" p={{ base: 4, md: 6 }}>
+      <Heading as="h2" size={{ base: "lg", md: "xl" }} mb={6} textAlign="center" color={headingColor}>Match Predictor</Heading>
 
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
@@ -369,8 +369,8 @@ export const MatchOdds = () => {
 
       {!loadingUsers && (
         <>
-          <Heading as="h3" size="lg" mb={4} color={headingColor} textAlign="center">Configure Teams</Heading>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={8}>
+          <Heading as="h3" size={{ base: "md", md: "lg" }} mb={4} color={headingColor} textAlign="center">Configure Teams</Heading>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={{ base: 4, md: 6 }} mb={8}>
             <Card bg={cardBg} variant="outline">
               <CardHeader pb={2}><Heading size="md" textAlign="center" color="blue.500">Team 1</Heading></CardHeader>
               <CardBody pt={2}>
@@ -390,10 +390,10 @@ export const MatchOdds = () => {
           {allPlayersSelected && (
             <VStack spacing={8} divider={<StackDivider borderColor={useColorModeValue("gray.200", "gray.600")} />}>
               <Box w="100%">
-                <Heading as="h3" size="lg" mb={6} textAlign="center" color={headingColor}>Player Details</Heading>
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={6}>
+                <Heading as="h3" size={{ base: "md", md: "lg" }} mb={6} textAlign="center" color={headingColor}>Player Details</Heading>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={{ base: 4, md: 6 }} mb={6}>
                   <Card bg={cardBg} variant="outline">
-                    <CardHeader><Heading size="md" color="blue.500">{team1DisplayName}</Heading></CardHeader>
+                    <CardHeader><Heading size={{ base: "sm", md: "md" }} color="blue.500">{team1DisplayName}</Heading></CardHeader>
                     <CardBody>
                       {renderPlayerCard(selectedPlayers.team1Defense, "Defense")}
                       {renderPlayerCard(selectedPlayers.team1Offense, "Offense")}
@@ -401,7 +401,7 @@ export const MatchOdds = () => {
                     </CardBody>
                   </Card>
                   <Card bg={cardBg} variant="outline">
-                    <CardHeader><Heading size="md" color="orange.500">{team2DisplayName}</Heading></CardHeader>
+                    <CardHeader><Heading size={{ base: "sm", md: "md" }} color="orange.500">{team2DisplayName}</Heading></CardHeader>
                     <CardBody>
                       {renderPlayerCard(selectedPlayers.team2Defense, "Defense")}
                       {renderPlayerCard(selectedPlayers.team2Offense, "Offense")}

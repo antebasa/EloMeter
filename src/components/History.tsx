@@ -193,10 +193,17 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
   }
 
   return (
-    <Box maxWidth="900px" mx="auto" p={6} borderRadius="lg" boxShadow="md" bg="white">
+    <Box 
+      maxWidth={{ base: "100%", md: "900px" }} 
+      mx="auto" 
+      p={{ base: 4, md: 6 }} 
+      borderRadius="lg" 
+      boxShadow="md" 
+      bg="white"
+    >
       <Flex direction={{ base: "column", md: "row" }} align={{ base: "flex-start", md: "center" }} mb={6}>
-        <Heading as="h2" size="lg" flex="1">Player History</Heading>
-        <Box maxWidth="300px" w="100%">
+        <Heading as="h2" size={{ base: "md", md: "lg" }} flex="1" mb={{ base: 4, md: 0 }}>Player History</Heading>
+        <Box maxWidth={{ base: "100%", md: "300px" }} w="100%">
           <Select
             value={selectedPlayer === null ? "" : selectedPlayer.toString()}
             onChange={handlePlayerChange}
@@ -214,7 +221,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
       {currentPlayerData && !loading && (
         <Flex
           mb={6}
-          p={4}
+          p={{ base: 3, md: 4 }}
           bg="blue.50"
           borderRadius="md"
           align="center"
@@ -222,34 +229,40 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
           direction={{ base: "column", sm: "row" }}
         >
           <Box mb={{ base: 4, sm: 0 }}>
-            <Heading as="h3" size="md">{currentPlayerData.name}</Heading>
-            <Text color="gray.600">
+            <Heading as="h3" size={{ base: "sm", md: "md" }}>{currentPlayerData.name}</Heading>
+            <Text color="gray.600" fontSize={{ base: "sm", md: "md" }}>
               {playerStats.played} matches played ({playerStats.wins} wins, {playerStats.losses} losses)
             </Text>
           </Box>
-          <Flex direction={{ base: "row", md: "row" }} justify="space-around" flex="1">
-            <Box textAlign="center">
-              <Heading as="h4" size="md" color="gray.600">Offense ELO</Heading>
-              <Text fontSize="2xl" fontWeight="bold" color="purple.600">
+          <Flex 
+            direction={{ base: "column", sm: "row" }} 
+            justify="space-around" 
+            flex="1" 
+            gap={{ base: 2, sm: 4 }}
+            wrap="wrap"
+          >
+            <Box textAlign="center" minW={{ base: "auto", sm: "80px" }}>
+              <Heading as="h4" size={{ base: "xs", md: "sm" }} color="gray.600">Offense ELO</Heading>
+              <Text fontSize={{ base: "lg", md: "2xl" }} fontWeight="bold" color="purple.600">
                 {playerStats.elo_offense}
               </Text>
             </Box>
-            <Box textAlign="center">
-              <Heading as="h4" size="md" color="gray.600">Defense ELO</Heading>
-              <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+            <Box textAlign="center" minW={{ base: "auto", sm: "80px" }}>
+              <Heading as="h4" size={{ base: "xs", md: "sm" }} color="gray.600">Defense ELO</Heading>
+              <Text fontSize={{ base: "lg", md: "2xl" }} fontWeight="bold" color="blue.600">
                 {playerStats.elo_defense}
               </Text>
             </Box>
-            <Box textAlign="center">
-              <Heading as="h4" size="md" color="gray.600">Combined</Heading>
-              <Text fontSize="2xl" fontWeight="bold" color="teal.600">
+            <Box textAlign="center" minW={{ base: "auto", sm: "80px" }}>
+              <Heading as="h4" size={{ base: "xs", md: "sm" }} color="gray.600">Combined</Heading>
+              <Text fontSize={{ base: "lg", md: "2xl" }} fontWeight="bold" color="teal.600">
                 {combinedElo}
               </Text>
             </Box>
           </Flex>
-          <Box textAlign="center" ml={{ base: 0, md: 4 }}>
-            <Text fontWeight="bold">Goals</Text>
-            <HStack spacing={4} justify="center">
+          <Box textAlign="center" ml={{ base: 0, md: 4 }} mt={{ base: 4, sm: 0 }}>
+            <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>Goals</Text>
+            <HStack spacing={{ base: 2, md: 4 }} justify="center">
               <Box>
                 <Text fontWeight="bold" color="green.500">{playerStats.scored}</Text>
                 <Text fontSize="sm">Scored</Text>
@@ -282,9 +295,9 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
       ) : (
         <>
           <Box mb={8}>
-            <Flex justify="space-between" align="center" mb={2}>
-              <Heading as="h3" size="md">ELO Rating History</Heading>
-              <HStack spacing={3}>
+            <Flex justify="space-between" align="center" mb={2} direction={{ base: "column", md: "row" }}>
+              <Heading as="h3" size={{ base: "sm", md: "md" }} mb={{ base: 2, md: 0 }}>ELO Rating History</Heading>
+              <HStack spacing={3} flexWrap="wrap" justify={{ base: "center", md: "flex-end" }}>
                 <FormControl display="flex" alignItems="center" width="auto">
                   <Checkbox
                     id="show-offense-elo"
@@ -292,7 +305,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                     onChange={() => setShowOffenseElo(!showOffenseElo)}
                     colorScheme="purple"
                   >
-                    <Text fontSize="sm">Offense</Text>
+                    <Text fontSize={{ base: "xs", md: "sm" }}>Offense</Text>
                   </Checkbox>
                 </FormControl>
                 <FormControl display="flex" alignItems="center" width="auto">
@@ -302,7 +315,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                     onChange={() => setShowDefenseElo(!showDefenseElo)}
                     colorScheme="blue"
                   >
-                    <Text fontSize="sm">Defense</Text>
+                    <Text fontSize={{ base: "xs", md: "sm" }}>Defense</Text>
                   </Checkbox>
                 </FormControl>
               </HStack>
@@ -314,7 +327,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                 <AlertDescription>No rating history available for this player.</AlertDescription>
               </Alert>
             ) : (
-              <Box height="300px" bg="whiteAlpha.100" borderRadius="md" p={2}>
+              <Box height={{ base: "250px", md: "300px" }} bg="whiteAlpha.100" borderRadius="md" p={2}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={chartData}
@@ -362,7 +375,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
           </Box>
 
           <Box>
-            <Heading as="h3" size="md" mb={4}>Recent Matches</Heading>
+            <Heading as="h3" size={{ base: "sm", md: "md" }} mb={4}>Recent Matches</Heading>
             {matchHistory.length === 0 ? (
               <Alert status="info" borderRadius="md">
                 <AlertIcon />
@@ -378,14 +391,16 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                   return (
                     <Flex
                       key={index}
-                      p={3}
+                      p={{ base: 2, md: 3 }}
                       borderRadius="md"
                       bg={isWin ? "blue.50" : isDraw ? "gray.100" : "gray.50"}
                       borderLeft={`4px solid ${isWin ? "#3182CE" : isDraw ? "#718096" : "#A0AEC0"}`}
                       justify="space-between"
                       align="center"
+                      direction={{ base: "column", sm: "row" }}
+                      gap={{ base: 2, sm: 0 }}
                     >
-                      <VStack align="flex-start" spacing={0}>
+                      <VStack align={{ base: "center", sm: "flex-start" }} spacing={0} flex="1">
                         <Text fontWeight="medium">
                           <Text as="span" fontWeight="bold">
                             {currentPlayerData?.name || ""}
