@@ -1,68 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
+  Avatar,
+  Badge,
   Box,
-  Flex,
-  Heading,
-  Text,
-  Select,
   Button,
-  Grid,
-  GridItem,
   Card,
   CardBody,
   CardHeader,
-  Avatar,
-  Badge,
-  VStack,
+  Flex,
+  FormControl,
+  FormLabel,
+  Grid,
+  GridItem,
+  Heading,
   HStack,
+  Select,
+  Spinner,
   Stat,
   StatLabel,
   StatNumber,
-  StatHelpText,
-  StatArrow,
-  useColorModeValue,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  Divider,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Tag,
   Switch,
-  FormControl,
-  FormLabel,
+  Table,
+  Tag,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useColorModeValue,
+  VStack,
 } from '@chakra-ui/react';
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
-  LineChart,
+  Legend,
   Line,
-  RadarChart,
-  PolarGrid,
+  LineChart,
+  Pie,
+  PieChart,
   PolarAngleAxis,
+  PolarGrid,
   PolarRadiusAxis,
   Radar,
-  ComposedChart,
-  Area,
-  AreaChart,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import { getUsers, getPlayerEloHistory, getPlayerMatchHistory, getHeadToHeadMatches } from '../lib/supabase';
-import type { User } from '../lib/supabase';
+import type {User} from '../lib/supabase';
+import {getHeadToHeadMatches, getPlayerEloHistory, getPlayerMatchHistory, getUsers} from '../lib/supabase';
 
 interface PlayerWithStats extends User {
   winPercentage: number;
@@ -870,7 +864,7 @@ export const PlayerComparison: React.FC = () => {
                   </StatNumber>
                 </Stat>
               </HStack>
-              
+
               {/* Role Distribution Summary */}
               <Box mt={4} p={3} bg="gray.50" borderRadius="md">
                 <Text fontSize="sm" fontWeight="semibold" mb={2} color="gray.700">Role Distribution:</Text>
@@ -924,7 +918,7 @@ export const PlayerComparison: React.FC = () => {
                     const teamWon = match.player1Result === 'Win';
                     const teamScore = teamWon ? Math.max(match.teamWhiteScore, match.teamBlueScore) : Math.min(match.teamWhiteScore, match.teamBlueScore);
                     const opponentScore = teamWon ? Math.min(match.teamWhiteScore, match.teamBlueScore) : Math.max(match.teamWhiteScore, match.teamBlueScore);
-                    
+
                     return (
                       <Tr key={index}>
                         <Td>{new Date(match.date).toLocaleDateString()}</Td>
@@ -954,11 +948,11 @@ export const PlayerComparison: React.FC = () => {
                         </Td>
                         <Td textAlign="center">
                           <VStack spacing={0}>
-                            <Text 
-                              fontSize="sm" 
-                              fontWeight="semibold" 
+                            <Text
+                              fontSize="sm"
+                              fontWeight="semibold"
                               color="blue.600"
-                              bg={match.defensivePlayer === comparisonData.player1!.name ? 'blue.50' : 
+                              bg={match.defensivePlayer === comparisonData.player1!.name ? 'blue.50' :
                                   match.defensivePlayer === comparisonData.player2!.name ? 'green.50' : 'transparent'}
                               px={2}
                               py={1}
@@ -966,7 +960,7 @@ export const PlayerComparison: React.FC = () => {
                             >
                               {match.defensivePlayer || 'Unknown'}
                             </Text>
-                            {(match.defensivePlayer === comparisonData.player1!.name || 
+                            {(match.defensivePlayer === comparisonData.player1!.name ||
                               match.defensivePlayer === comparisonData.player2!.name) && (
                               <Badge size="xs" colorScheme="blue">DEF</Badge>
                             )}
@@ -974,11 +968,11 @@ export const PlayerComparison: React.FC = () => {
                         </Td>
                         <Td textAlign="center">
                           <VStack spacing={0}>
-                            <Text 
-                              fontSize="sm" 
-                              fontWeight="semibold" 
+                            <Text
+                              fontSize="sm"
+                              fontWeight="semibold"
                               color="orange.600"
-                              bg={match.offensivePlayer === comparisonData.player1!.name ? 'blue.50' : 
+                              bg={match.offensivePlayer === comparisonData.player1!.name ? 'blue.50' :
                                   match.offensivePlayer === comparisonData.player2!.name ? 'green.50' : 'transparent'}
                               px={2}
                               py={1}
@@ -986,7 +980,7 @@ export const PlayerComparison: React.FC = () => {
                             >
                               {match.offensivePlayer || 'Unknown'}
                             </Text>
-                            {(match.offensivePlayer === comparisonData.player1!.name || 
+                            {(match.offensivePlayer === comparisonData.player1!.name ||
                               match.offensivePlayer === comparisonData.player2!.name) && (
                               <Badge size="xs" colorScheme="orange">OFF</Badge>
                             )}
