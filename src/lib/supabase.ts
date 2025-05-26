@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+const SECOND_TIER_ELO = 1300
+
 // Basic check to ensure variables are loaded
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Supabase URL or Anon Key is missing. Make sure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your .env file or environment variables.");
@@ -102,8 +104,8 @@ function calculateExpectedScore(playerElo: number, opponentElo: number): number 
   return 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
 }
 
-function updateElo(playerElo: number, expectedScore: number, actualScore: number, scoreDiff: number | null = null): number {
-  let baseChange = K_FACTOR * (actualScore - expectedScore);
+function updateElo(playerElo: number, expectedScore: number, actualScore: number, kFactor: number, scoreDiff: number | null = null): number {
+  let baseChange = kFactor * (actualScore - expectedScore);
   if (scoreDiff !== null) {
     const scoreImpact = Math.min(Math.abs(scoreDiff) * SCORE_DIFF_MULTIPLIER, 1.0);
     baseChange *= (1 + scoreImpact);
@@ -223,10 +225,18 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
     const t2Actual = totalScoreValue > 0 ? matchData.team2Score / totalScoreValue : 0.5;
     const scoreDiff = matchData.team1Score - matchData.team2Score;
 
-    const newT1dDefElo = Math.round(updateElo(t1dDefElo, t1Expected, t1Actual, scoreDiff));
-    const newT1oOffElo = Math.round(updateElo(t1oOffElo, t1Expected, t1Actual, scoreDiff));
-    const newT2dDefElo = Math.round(updateElo(t2dDefElo, t2Expected, t2Actual, -scoreDiff));
-    const newT2oOffElo = Math.round(updateElo(t2oOffElo, t2Expected, t2Actual, -scoreDiff));
+    let currentKFactor = K_FACTOR;
+    const team1HasPlayerBelow1400 = t1dDefElo < SECOND_TIER_ELO || t1oOffElo < SECOND_TIER_ELO;
+    const team2HasPlayerBelow1400 = t2dDefElo < SECOND_TIER_ELO || t2oOffElo < SECOND_TIER_ELO;
+
+    if ((team1HasPlayerBelow1400 && !team2HasPlayerBelow1400) || (!team1HasPlayerBelow1400 && team2HasPlayerBelow1400)) {
+      currentKFactor = K_FACTOR / 2;
+    }
+
+    const newT1dDefElo = Math.round(updateElo(t1dDefElo, t1Expected, t1Actual, currentKFactor, scoreDiff));
+    const newT1oOffElo = Math.round(updateElo(t1oOffElo, t1Expected, t1Actual, currentKFactor, scoreDiff));
+    const newT2dDefElo = Math.round(updateElo(t2dDefElo, t2Expected, t2Actual, currentKFactor, -scoreDiff));
+    const newT2oOffElo = Math.round(updateElo(t2oOffElo, t2Expected, t2Actual, currentKFactor, -scoreDiff));
 
     const { data: matchInsertData, error: matchInsertError } = await supabase
       .from('Match')
