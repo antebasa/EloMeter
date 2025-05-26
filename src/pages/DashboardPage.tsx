@@ -10,6 +10,7 @@ import {History} from '../components/History';
 import {TeamSelection} from '../components/OptimalTeams';
 import {Players} from '../components/Players';
 import {AddPlayer} from '../components/AddPlayer';
+import {WinPercentage} from '../components/WinPercentage';
 import type {MatchData} from "../lib/supabase"; // Assuming supabase.ts exports this type
 
 const DashboardPage: React.FC = () => {
@@ -58,6 +59,8 @@ const DashboardPage: React.FC = () => {
                     console.warn("Unauthorized access attempt to AddPlayer");
                     return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
                 }
+            case 'WinPercentage':
+                return <WinPercentage />;
             default:
                 return <Players onPlayerClick={handleNavigateToHistoryWithPlayer} />;
         }

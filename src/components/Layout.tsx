@@ -58,6 +58,7 @@ export const Layout = ({ children, activeNavItem, onNavItemClick }: LayoutProps)
     { name: 'History', label: 'History' },
     { name: 'OptimalTeams', label: 'Optimal Teams' },
     { name: 'Players', label: 'Players' },
+    { name: 'WinPercentage', label: 'Win Percentage' },
   ];
 
   if (user?.user_metadata?.admin) {
