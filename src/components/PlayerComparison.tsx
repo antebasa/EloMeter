@@ -87,8 +87,6 @@ interface ComparisonData {
   headToHeadMatches: any[];
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
-
 export const PlayerComparison: React.FC = () => {
   const [players, setPlayers] = useState<User[]>([]);
   const [selectedPlayer1Id, setSelectedPlayer1Id] = useState<string>('');
@@ -109,7 +107,6 @@ export const PlayerComparison: React.FC = () => {
 
   const cardBg = useColorModeValue('white', 'gray.700');
   const textColor = useColorModeValue('gray.800', 'whiteAlpha.900');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   useEffect(() => {
     loadPlayers();
@@ -143,7 +140,6 @@ export const PlayerComparison: React.FC = () => {
     // Calculate recent form (last 10 matches)
     const recentMatches = matchHistory.slice(0, 10);
     const recentWins = recentMatches.filter(match => match.result === 'Win').length;
-    const recentWinPercentage = recentMatches.length > 0 ? Math.round((recentWins / recentMatches.length) * 100) : 0;
 
     return {
       ...player,
@@ -421,7 +417,7 @@ export const PlayerComparison: React.FC = () => {
                     dataKey="value"
                     label={({ name, value }) => `${name}: ${value}`}
                   >
-                    {player1Data.map((entry, index) => (
+                    {player1Data.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={index === 0 ? '#38A169' : '#E53E3E'} />
                     ))}
                   </Pie>
@@ -444,7 +440,7 @@ export const PlayerComparison: React.FC = () => {
                     dataKey="value"
                     label={({ name, value }) => `${name}: ${value}`}
                   >
-                    {player2Data.map((entry, index) => (
+                    {player2Data.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={index === 0 ? '#38A169' : '#E53E3E'} />
                     ))}
                   </Pie>

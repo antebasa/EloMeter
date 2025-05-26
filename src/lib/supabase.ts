@@ -763,7 +763,7 @@ export async function getHeadToHeadMatches(
 
     // Find common matches by match_id
     const player1MatchIds = new Set(typedPlayer1Matches?.map(m => m.match_id.id) || []);
-    const commonMatches = typedPlayer2Matches?.filter(p2Match => 
+    const commonMatches = typedPlayer2Matches?.filter(p2Match =>
       player1MatchIds.has(p2Match.match_id.id)
     ) || [];
 
@@ -812,38 +812,38 @@ export async function getHeadToHeadMatches(
     // Process head-to-head matches
     const headToHeadMatches = commonMatches.slice(0, limit).map(p2Match => {
       const p1Match = typedPlayer1Matches?.find(p1 => p1.match_id.id === p2Match.match_id.id);
-      
+
       if (!p1Match) return null;
 
       const matchDetails = p2Match.match_id;
       const player1Score = p1Match.scored;
       const player2Score = p2Match.scored;
-      
+
       // Determine if they were teammates or opponents
       const sameTeam = p1Match.team_id.id === p2Match.team_id.id;
-      
+
       // Get team details for role information
       const teamDetails = teamMap[p1Match.team_id.id];
       let defensivePlayer = 'Unknown';
       let offensivePlayer = 'Unknown';
-      
+
       if (sameTeam && teamDetails) {
         // Both players on same team - get their roles
         defensivePlayer = userMap[teamDetails.player_defense_id] || 'Unknown';
         offensivePlayer = userMap[teamDetails.player_offense_id] || 'Unknown';
       }
-      
+
       // Determine team results based on actual team scores (not individual scores)
       let player1Result: string;
       let player2Result: string;
-      
+
       if (sameTeam) {
         // Both players on same team - use team score vs opponent team score
         const theirTeamId = p1Match.team_id.id;
         const isWhiteTeam = matchDetails.white_team_id === theirTeamId;
         const theirTeamScore = isWhiteTeam ? matchDetails.team_white_score : matchDetails.team_blue_score;
         const opponentTeamScore = isWhiteTeam ? matchDetails.team_blue_score : matchDetails.team_white_score;
-        
+
         if (theirTeamScore > opponentTeamScore) {
           player1Result = 'Win';
           player2Result = 'Win';
@@ -854,12 +854,11 @@ export async function getHeadToHeadMatches(
       } else {
         // Players on different teams - use team scores
         const player1TeamId = p1Match.team_id.id;
-        const player2TeamId = p2Match.team_id.id;
-        
+
         const player1IsWhite = matchDetails.white_team_id === player1TeamId;
         const player1TeamScore = player1IsWhite ? matchDetails.team_white_score : matchDetails.team_blue_score;
         const player2TeamScore = player1IsWhite ? matchDetails.team_blue_score : matchDetails.team_white_score;
-        
+
         if (player1TeamScore > player2TeamScore) {
           player1Result = 'Win';
           player2Result = 'Loss';
@@ -874,9 +873,9 @@ export async function getHeadToHeadMatches(
       if (sameTeam) {
         // Find the opposing team
         const theirTeamId = p1Match.team_id.id;
-        const opponentTeamId = matchDetails.white_team_id === theirTeamId ? 
+        const opponentTeamId = matchDetails.white_team_id === theirTeamId ?
           matchDetails.blue_team_id : matchDetails.white_team_id;
-        
+
         const opponentTeam = teamMap[opponentTeamId];
         if (opponentTeam) {
           const oppDefName = userMap[opponentTeam.player_defense_id] || 'Unknown';
@@ -887,7 +886,7 @@ export async function getHeadToHeadMatches(
         // They were opponents, so show each other
         opponents = `vs ${userMap[player1Id]} & ${userMap[player2Id]}`;
       }
-      
+
       return {
         id: matchDetails.id,
         date: matchDetails.created_at,
@@ -903,11 +902,11 @@ export async function getHeadToHeadMatches(
         opponents,
         defensivePlayer,
         offensivePlayer,
-        player1EloChange: p1Match.new_elo !== p1Match.old_elo ? 
-          p1Match.new_elo - p1Match.old_elo : 
+        player1EloChange: p1Match.new_elo !== p1Match.old_elo ?
+          p1Match.new_elo - p1Match.old_elo :
           p1Match.new_elo_offense - p1Match.old_elo_offense,
-        player2EloChange: p2Match.new_elo !== p2Match.old_elo ? 
-          p2Match.new_elo - p2Match.old_elo : 
+        player2EloChange: p2Match.new_elo !== p2Match.old_elo ?
+          p2Match.new_elo - p2Match.old_elo :
           p2Match.new_elo_offense - p2Match.old_elo_offense,
       };
     }).filter(match => match !== null);
