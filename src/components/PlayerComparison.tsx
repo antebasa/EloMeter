@@ -27,6 +27,13 @@ import {
   AlertTitle,
   AlertDescription,
   Divider,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Tag,
 } from '@chakra-ui/react';
 import {
   BarChart,
@@ -51,7 +58,7 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
-import { getUsers, getPlayerEloHistory, getPlayerMatchHistory } from '../lib/supabase';
+import { getUsers, getPlayerEloHistory, getPlayerMatchHistory, getHeadToHeadMatches } from '../lib/supabase';
 import type { User } from '../lib/supabase';
 
 interface PlayerWithStats extends User {
@@ -80,6 +87,7 @@ interface ComparisonData {
   player2EloHistory: any[];
   player1MatchHistory: any[];
   player2MatchHistory: any[];
+  headToHeadMatches: any[];
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
@@ -95,6 +103,7 @@ export const PlayerComparison: React.FC = () => {
     player2EloHistory: [],
     player1MatchHistory: [],
     player2MatchHistory: [],
+    headToHeadMatches: [],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,12 +131,12 @@ export const PlayerComparison: React.FC = () => {
     const played = player.played || 0;
     const scored = player.scored || 0;
     const conceded = player.conceded || 0;
-    
+
     const winPercentage = played > 0 ? Math.round((wins / played) * 100) : 0;
     const avgGoalsPerMatch = played > 0 ? Math.round((scored / played) * 100) / 100 : 0;
     const avgConcededPerMatch = played > 0 ? Math.round((conceded / played) * 100) / 100 : 0;
     const goalDifference = scored - conceded;
-    
+
     const offenseElo = player.elo_offense ?? 1400;
     const defenseElo = player.elo_defense ?? 1400;
     const overallElo = Math.round((offenseElo + defenseElo) / 2);
@@ -186,11 +195,13 @@ export const PlayerComparison: React.FC = () => {
         player2EloHistory,
         player1MatchHistory,
         player2MatchHistory,
+        headToHeadMatches,
       ] = await Promise.all([
         getPlayerEloHistory(player1.id),
         getPlayerEloHistory(player2.id),
         getPlayerMatchHistory(player1.id),
         getPlayerMatchHistory(player2.id),
+        getHeadToHeadMatches(player1.id, player2.id),
       ]);
 
       const player1WithStats = calculatePlayerStats(player1, player1MatchHistory);
@@ -203,6 +214,7 @@ export const PlayerComparison: React.FC = () => {
         player2EloHistory,
         player1MatchHistory,
         player2MatchHistory,
+        headToHeadMatches,
       });
     } catch (err) {
       console.error('Error comparing players:', err);
@@ -215,7 +227,7 @@ export const PlayerComparison: React.FC = () => {
   const renderPlayerCard = (player: PlayerWithStats, playerNumber: number) => {
     const isPlayer1 = playerNumber === 1;
     const cardColor = isPlayer1 ? 'blue.500' : 'green.500';
-    
+
     return (
       <Card bg={cardBg} borderColor={cardColor} borderWidth="2px">
         <CardHeader>
@@ -456,7 +468,7 @@ export const PlayerComparison: React.FC = () => {
         date: new Date(entry.x).getTime(),
         [`${playerName}_offense`]: entry.y,
       }));
-      
+
       const defenseData = history.filter(entry => entry.type === 'defense').map(entry => ({
         date: new Date(entry.x).getTime(),
         [`${playerName}_defense`]: entry.y,
@@ -480,10 +492,10 @@ export const PlayerComparison: React.FC = () => {
 
     const combinedData = uniqueDates.map(date => {
       const result: any = { date };
-      
+
       // Find closest data points for each player and type
       const findClosestValue = (data: any[], targetDate: number, key: string) => {
-        const closest = data.reduce((prev, curr) => 
+        const closest = data.reduce((prev, curr) =>
           Math.abs(curr.date - targetDate) < Math.abs(prev.date - targetDate) ? curr : prev
         );
         return closest[key];
@@ -491,38 +503,52 @@ export const PlayerComparison: React.FC = () => {
 
       if (player1History.offenseData.length > 0) {
         result[`${comparisonData.player1!.name}_offense`] = findClosestValue(
-          player1History.offenseData, 
-          date, 
+          player1History.offenseData,
+          date,
           `${comparisonData.player1!.name}_offense`
         );
       }
-      
+
       if (player1History.defenseData.length > 0) {
         result[`${comparisonData.player1!.name}_defense`] = findClosestValue(
-          player1History.defenseData, 
-          date, 
+          player1History.defenseData,
+          date,
           `${comparisonData.player1!.name}_defense`
         );
       }
-      
+
       if (player2History.offenseData.length > 0) {
         result[`${comparisonData.player2!.name}_offense`] = findClosestValue(
-          player2History.offenseData, 
-          date, 
+          player2History.offenseData,
+          date,
           `${comparisonData.player2!.name}_offense`
         );
       }
-      
+
       if (player2History.defenseData.length > 0) {
         result[`${comparisonData.player2!.name}_defense`] = findClosestValue(
-          player2History.defenseData, 
-          date, 
+          player2History.defenseData,
+          date,
           `${comparisonData.player2!.name}_defense`
         );
       }
 
       return result;
     });
+
+    // Calculate Y-axis domain for better readability
+    const allEloValues = combinedData.flatMap(entry =>
+      Object.keys(entry)
+        .filter(key => key !== 'date')
+        .map(key => entry[key])
+        .filter(value => typeof value === 'number')
+    );
+
+    const minElo = Math.min(...allEloValues);
+    const maxElo = Math.max(...allEloValues);
+    const padding = (maxElo - minElo) * 0.1; // 10% padding
+    const yAxisMin = Math.max(1000, Math.floor((minElo - padding) / 50) * 50); // Round to nearest 50, min 1000
+    const yAxisMax = Math.ceil((maxElo + padding) / 50) * 50; // Round to nearest 50
 
     return (
       <Card bg={cardBg}>
@@ -533,43 +559,50 @@ export const PlayerComparison: React.FC = () => {
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={combinedData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 type="number"
                 scale="time"
                 domain={['dataMin', 'dataMax']}
                 tickFormatter={(value) => new Date(value).toLocaleDateString()}
               />
-              <YAxis />
-              <Tooltip 
+              <YAxis
+                domain={[yAxisMin, yAxisMax]}
+                tickCount={8}
+                tickFormatter={(value) => Math.round(value).toString()}
+              />
+              <Tooltip
                 labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                formatter={(value: any, name: any) => [Math.round(value), name]}
               />
               <Legend />
-              <Line 
-                type="monotone" 
-                dataKey={`${comparisonData.player1!.name}_offense`} 
-                stroke="#3182CE" 
-                strokeDasharray="5 5"
+              <Line
+                type="monotone"
+                dataKey={`${comparisonData.player1!.name}_offense`}
+                stroke="#3182CE"
                 name={`${comparisonData.player1!.name} (Offense)`}
+                strokeWidth={2}
               />
-              <Line 
-                type="monotone" 
-                dataKey={`${comparisonData.player1!.name}_defense`} 
-                stroke="#3182CE" 
+              <Line
+                type="monotone"
+                dataKey={`${comparisonData.player1!.name}_defense`}
+                stroke="#38A169"
                 name={`${comparisonData.player1!.name} (Defense)`}
+                strokeWidth={2}
               />
-              <Line 
-                type="monotone" 
-                dataKey={`${comparisonData.player2!.name}_offense`} 
-                stroke="#38A169" 
-                strokeDasharray="5 5"
+              <Line
+                type="monotone"
+                dataKey={`${comparisonData.player2!.name}_offense`}
+                stroke="#D69E2E"
                 name={`${comparisonData.player2!.name} (Offense)`}
+                strokeWidth={2}
               />
-              <Line 
-                type="monotone" 
-                dataKey={`${comparisonData.player2!.name}_defense`} 
-                stroke="#38A169" 
+              <Line
+                type="monotone"
+                dataKey={`${comparisonData.player2!.name}_defense`}
+                stroke="#E53E3E"
                 name={`${comparisonData.player2!.name} (Defense)`}
+                strokeWidth={2}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -581,26 +614,33 @@ export const PlayerComparison: React.FC = () => {
   const renderGoalsComparisonChart = () => {
     if (!comparisonData.player1 || !comparisonData.player2) return null;
 
+    const player1Goals = comparisonData.player1.scored || 0;
+    const player2Goals = comparisonData.player2.scored || 0;
+    const totalGoals = player1Goals + player2Goals;
+
+    if (totalGoals === 0) {
+      return (
+        <Card bg={cardBg}>
+          <CardHeader>
+            <Heading size="md" color={textColor}>Goals Comparison</Heading>
+          </CardHeader>
+          <CardBody>
+            <Text textAlign="center" color="gray.500">No goals data available</Text>
+          </CardBody>
+        </Card>
+      );
+    }
+
     const data = [
       {
-        category: 'Goals Scored',
-        [comparisonData.player1.name]: comparisonData.player1.scored || 0,
-        [comparisonData.player2.name]: comparisonData.player2.scored || 0,
+        name: comparisonData.player1.name,
+        value: player1Goals,
+        percentage: Math.round((player1Goals / totalGoals) * 100),
       },
       {
-        category: 'Goals Conceded',
-        [comparisonData.player1.name]: comparisonData.player1.conceded || 0,
-        [comparisonData.player2.name]: comparisonData.player2.conceded || 0,
-      },
-      {
-        category: 'Avg Goals/Match',
-        [comparisonData.player1.name]: comparisonData.player1.avgGoalsPerMatch || 0,
-        [comparisonData.player2.name]: comparisonData.player2.avgGoalsPerMatch || 0,
-      },
-      {
-        category: 'Avg Conceded/Match',
-        [comparisonData.player1.name]: comparisonData.player1.avgConcededPerMatch || 0,
-        [comparisonData.player2.name]: comparisonData.player2.avgConcededPerMatch || 0,
+        name: comparisonData.player2.name,
+        value: player2Goals,
+        percentage: Math.round((player2Goals / totalGoals) * 100),
       },
     ];
 
@@ -608,19 +648,164 @@ export const PlayerComparison: React.FC = () => {
       <Card bg={cardBg}>
         <CardHeader>
           <Heading size="md" color={textColor}>Goals Comparison</Heading>
+          <Text fontSize="sm" color="gray.500">
+            Total Goals: {totalGoals} | {comparisonData.player1.name}: {player1Goals} ({data[0].percentage}%) | {comparisonData.player2.name}: {player2Goals} ({data[1].percentage}%)
+          </Text>
         </CardHeader>
         <CardBody>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="category" type="category" width={120} />
-              <Tooltip />
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+                label={({ name, value, percentage }) => `${name}: ${value} (${percentage}%)`}
+              >
+                <Cell fill="#3182CE" />
+                <Cell fill="#38A169" />
+              </Pie>
+              <Tooltip formatter={(value, name) => [`${value} goals`, name]} />
               <Legend />
-              <Bar dataKey={comparisonData.player1.name} fill="#3182CE" />
-              <Bar dataKey={comparisonData.player2.name} fill="#38A169" />
-            </BarChart>
+            </PieChart>
           </ResponsiveContainer>
+        </CardBody>
+      </Card>
+    );
+  };
+
+  const renderHeadToHeadSection = () => {
+    if (!comparisonData.headToHeadMatches.length) {
+      return (
+        <Card bg={cardBg}>
+          <CardHeader>
+            <Heading size="md" color={textColor}>Head-to-Head Matches</Heading>
+          </CardHeader>
+          <CardBody>
+            <Text textAlign="center" color="gray.500">
+              No head-to-head matches found between these players
+            </Text>
+          </CardBody>
+        </Card>
+      );
+    }
+
+    // Calculate head-to-head stats
+    const player1Wins = comparisonData.headToHeadMatches.filter(match => match.player1Result === 'Win').length;
+    const player2Wins = comparisonData.headToHeadMatches.filter(match => match.player2Result === 'Win').length;
+    const draws = comparisonData.headToHeadMatches.filter(match => match.player1Result === 'Draw').length;
+    const totalMatches = comparisonData.headToHeadMatches.length;
+
+    const asTeammates = comparisonData.headToHeadMatches.filter(match => match.sameTeam).length;
+    const asOpponents = totalMatches - asTeammates;
+
+    return (
+      <Card bg={cardBg}>
+        <CardHeader>
+          <Heading size="md" color={textColor}>Head-to-Head Matches</Heading>
+          <HStack spacing={4} mt={2}>
+            <Stat size="sm">
+              <StatLabel>Total Matches</StatLabel>
+              <StatNumber>{totalMatches}</StatNumber>
+            </Stat>
+            <Stat size="sm">
+              <StatLabel>{comparisonData.player1!.name} Wins</StatLabel>
+              <StatNumber color="blue.500">{player1Wins}</StatNumber>
+            </Stat>
+            <Stat size="sm">
+              <StatLabel>{comparisonData.player2!.name} Wins</StatLabel>
+              <StatNumber color="green.500">{player2Wins}</StatNumber>
+            </Stat>
+            <Stat size="sm">
+              <StatLabel>Draws</StatLabel>
+              <StatNumber>{draws}</StatNumber>
+            </Stat>
+          </HStack>
+          <HStack spacing={4} mt={2}>
+            <Tag colorScheme="blue" size="sm">As Teammates: {asTeammates}</Tag>
+            <Tag colorScheme="red" size="sm">As Opponents: {asOpponents}</Tag>
+          </HStack>
+        </CardHeader>
+        <CardBody>
+          <Table variant="simple" size="sm">
+            <Thead>
+              <Tr>
+                <Th>Date</Th>
+                <Th>Relationship</Th>
+                <Th textAlign="center">{comparisonData.player1!.name}</Th>
+                <Th textAlign="center">{comparisonData.player2!.name}</Th>
+                <Th textAlign="center">Team Score</Th>
+                <Th textAlign="center">ELO Change</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {comparisonData.headToHeadMatches.slice(0, 10).map((match, index) => (
+                <Tr key={index}>
+                  <Td>{new Date(match.date).toLocaleDateString()}</Td>
+                  <Td>
+                    <Tag
+                      size="sm"
+                      colorScheme={match.sameTeam ? 'blue' : 'red'}
+                    >
+                      {match.sameTeam ? 'Teammates' : 'Opponents'}
+                    </Tag>
+                  </Td>
+                  <Td textAlign="center">
+                    <VStack spacing={0}>
+                      <Text
+                        fontWeight={match.player1Result === 'Win' ? 'bold' : 'normal'}
+                        color={match.player1Result === 'Win' ? 'green.500' :
+                               match.player1Result === 'Loss' ? 'red.500' : 'gray.500'}
+                      >
+                        {match.player1Score}
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">{match.player1Result}</Text>
+                    </VStack>
+                  </Td>
+                  <Td textAlign="center">
+                    <VStack spacing={0}>
+                      <Text
+                        fontWeight={match.player2Result === 'Win' ? 'bold' : 'normal'}
+                        color={match.player2Result === 'Win' ? 'green.500' :
+                               match.player2Result === 'Loss' ? 'red.500' : 'gray.500'}
+                      >
+                        {match.player2Score}
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">{match.player2Result}</Text>
+                    </VStack>
+                  </Td>
+                  <Td textAlign="center">
+                    <Text fontSize="sm">
+                      {match.teamWhiteScore} - {match.teamBlueScore}
+                    </Text>
+                  </Td>
+                  <Td textAlign="center">
+                    <VStack spacing={0}>
+                      <Text
+                        fontSize="xs"
+                        color={match.player1EloChange >= 0 ? 'green.500' : 'red.500'}
+                      >
+                        {match.player1EloChange >= 0 ? '+' : ''}{Math.round(match.player1EloChange)}
+                      </Text>
+                      <Text
+                        fontSize="xs"
+                        color={match.player2EloChange >= 0 ? 'green.500' : 'red.500'}
+                      >
+                        {match.player2EloChange >= 0 ? '+' : ''}{Math.round(match.player2EloChange)}
+                      </Text>
+                    </VStack>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+          {comparisonData.headToHeadMatches.length > 10 && (
+            <Text fontSize="sm" color="gray.500" mt={2} textAlign="center">
+              Showing latest 10 of {comparisonData.headToHeadMatches.length} matches
+            </Text>
+          )}
         </CardBody>
       </Card>
     );
@@ -629,7 +814,7 @@ export const PlayerComparison: React.FC = () => {
   return (
     <Box p={6}>
       <VStack spacing={6} align="stretch">
-        <Heading size="lg" color={textColor} textAlign="center">
+        <Heading size="lg" color={'white'} textAlign="center">
           Player Comparison
         </Heading>
 
@@ -731,10 +916,13 @@ export const PlayerComparison: React.FC = () => {
               <GridItem>
                 {renderEloHistoryChart()}
               </GridItem>
+              <GridItem>
+                {renderHeadToHeadSection()}
+              </GridItem>
             </Grid>
           </VStack>
         )}
       </VStack>
     </Box>
   );
-}; 
+};
