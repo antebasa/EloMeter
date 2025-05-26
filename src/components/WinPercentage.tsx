@@ -222,7 +222,7 @@ export const WinPercentage: React.FC = () => {
         const isOffense = team.player_offense_id === stat.user_id;
 
         // Determine if this was a win (team scored 10)
-        const teamWon = (isBlueTeam && match.team_blue_score === 10) || 
+        const teamWon = (isBlueTeam && match.team_blue_score === 10) ||
                        (isWhiteTeam && match.team_white_score === 10);
 
         // Update totals
@@ -255,25 +255,25 @@ export const WinPercentage: React.FC = () => {
 
   const renderPlayerTable = (players: PlayerTeamStats[], position: 'defense' | 'offense', teamColor: 'blue' | 'white') => {
     const filteredPlayers = players.filter(player => {
-      const total = teamColor === 'blue' 
+      const total = teamColor === 'blue'
         ? (position === 'defense' ? player.total_blue_defense : player.total_blue_offense)
         : (position === 'defense' ? player.total_white_defense : player.total_white_offense);
       return total > 0;
     });
-    
+
     // Sort players by wins (default sorting)
     const sortedPlayers = [...filteredPlayers].sort((a, b) => {
-      const aWins = teamColor === 'blue' 
+      const aWins = teamColor === 'blue'
         ? (position === 'defense' ? a.wins_as_blue_defense : a.wins_as_blue_offense)
         : (position === 'defense' ? a.wins_as_white_defense : a.wins_as_white_offense);
-      const bWins = teamColor === 'blue' 
+      const bWins = teamColor === 'blue'
         ? (position === 'defense' ? b.wins_as_blue_defense : b.wins_as_blue_offense)
         : (position === 'defense' ? b.wins_as_white_defense : b.wins_as_white_offense);
       return bWins - aWins;
     });
 
     const colorScheme = teamColor === 'blue' ? 'blue' : 'gray';
-    const headerColor = teamColor === 'blue' ? 'blue.400' : 'gray.300';
+    const headerColor = teamColor === 'blue' ? 'blue.400' : 'gray.500';
 
     return (
       <Card bg={cardBg} shadow="lg">
@@ -302,15 +302,15 @@ export const WinPercentage: React.FC = () => {
             </Thead>
             <Tbody>
               {sortedPlayers.slice(0, 10).map((player, idx) => {
-                const wins = teamColor === 'blue' 
+                const wins = teamColor === 'blue'
                   ? (position === 'defense' ? player.wins_as_blue_defense : player.wins_as_blue_offense)
                   : (position === 'defense' ? player.wins_as_white_defense : player.wins_as_white_offense);
-                const total = teamColor === 'blue' 
+                const total = teamColor === 'blue'
                   ? (position === 'defense' ? player.total_blue_defense : player.total_blue_offense)
                   : (position === 'defense' ? player.total_white_defense : player.total_white_offense);
-                
+
                 return (
-                  <Tr 
+                  <Tr
                     key={`${player.id}-${teamColor}-${position}`}
                     _hover={{ bg: rowHoverBg }}
                     transition="background-color 0.2s ease-in-out"
@@ -321,11 +321,11 @@ export const WinPercentage: React.FC = () => {
                         <Text mr={'15px'} fontWeight="medium" color={playerNameColor}>
                           {idx + 1}.
                         </Text>
-                        <Avatar 
-                          size="xs" 
-                          name={player.name} 
+                        <Avatar
+                          size="xs"
+                          name={player.name}
                           mr={2}
-                          src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/${player.avatar_url}` : undefined} 
+                          src={player.avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/${player.avatar_url}` : undefined}
                         />
                         <Text color={playerNameColor} fontSize="sm" fontWeight="medium">
                           {player.name}
@@ -333,9 +333,7 @@ export const WinPercentage: React.FC = () => {
                       </Flex>
                     </Td>
                     <Td isNumeric>
-                      <Badge colorScheme={colorScheme} variant="solid">
                         {wins}
-                      </Badge>
                     </Td>
                     <Td isNumeric>
                       <Text color={textColor}>{total}</Text>
@@ -524,7 +522,7 @@ export const WinPercentage: React.FC = () => {
           <Heading size="lg" textAlign="center" color="white">
             Top Players by Team & Position
           </Heading>
-          
+
           {/* Blue Team Players */}
           <VStack spacing={4} align="stretch">
             <Heading size="md" color="blue.400" textAlign="center">
