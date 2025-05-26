@@ -724,3 +724,99 @@ export async function getAllPlayerMatchStats(): Promise<PlayerMatchStatsQueryRes
   // This satisfies the linter that we're acknowledging the type conversion risk.
   return (data as unknown as PlayerMatchStatsQueryResultEntry[]) || [];
 }
+
+// New function to get head-to-head match data between two individual players
+export async function getHeadToHeadMatches(
+  player1Id: number,
+  player2Id: number,
+  limit: number = 10
+): Promise<any[]> {
+  try {
+    // Get all matches where both players participated
+    const { data: player1Matches, error: p1Error } = await supabase
+      .from('PlayerMatchStats')
+      .select(`
+        id, user_id, created_at, scored, conceded, old_elo, new_elo, old_elo_offense, new_elo_offense,
+        match_id!inner ( id, created_at, white_team_id, blue_team_id, team_white_score, team_blue_score ),
+        team_id!inner ( id, player_defense_id, player_offense_id, name )
+      `)
+      .eq('user_id', player1Id)
+      .order('created_at', { ascending: false });
+
+    if (p1Error) throw p1Error;
+
+    const { data: player2Matches, error: p2Error } = await supabase
+      .from('PlayerMatchStats')
+      .select(`
+        id, user_id, created_at, scored, conceded, old_elo, new_elo, old_elo_offense, new_elo_offense,
+        match_id!inner ( id, created_at, white_team_id, blue_team_id, team_white_score, team_blue_score ),
+        team_id!inner ( id, player_defense_id, player_offense_id, name )
+      `)
+      .eq('user_id', player2Id)
+      .order('created_at', { ascending: false });
+
+    if (p2Error) throw p2Error;
+
+    // Cast to the proper type
+    const typedPlayer1Matches = player1Matches as unknown as PlayerMatchStatsQueryResultEntry[];
+    const typedPlayer2Matches = player2Matches as unknown as PlayerMatchStatsQueryResultEntry[];
+
+    // Find common matches by match_id
+    const player1MatchIds = new Set(typedPlayer1Matches?.map(m => m.match_id.id) || []);
+    const commonMatches = typedPlayer2Matches?.filter(p2Match => 
+      player1MatchIds.has(p2Match.match_id.id)
+    ) || [];
+
+    // Get user names for display
+    const { data: users, error: usersError } = await supabase
+      .from('User')
+      .select('id, name')
+      .in('id', [player1Id, player2Id]);
+
+    if (usersError) throw usersError;
+
+    const userMap = users?.reduce((acc, user) => {
+      acc[user.id] = user.name;
+      return acc;
+    }, {} as Record<number, string>) || {};
+
+    // Process head-to-head matches
+    const headToHeadMatches = commonMatches.slice(0, limit).map(p2Match => {
+      const p1Match = typedPlayer1Matches?.find(p1 => p1.match_id.id === p2Match.match_id.id);
+      
+      if (!p1Match) return null;
+
+      const matchDetails = p2Match.match_id;
+      const player1Score = p1Match.scored;
+      const player2Score = p2Match.scored;
+      
+      // Determine if they were teammates or opponents
+      const sameTeam = p1Match.team_id.id === p2Match.team_id.id;
+      
+      return {
+        id: matchDetails.id,
+        date: matchDetails.created_at,
+        player1Name: userMap[player1Id] || 'Player 1',
+        player2Name: userMap[player2Id] || 'Player 2',
+        player1Score,
+        player2Score,
+        player1Result: player1Score > player2Score ? 'Win' : (player1Score === player2Score ? 'Draw' : 'Loss'),
+        player2Result: player2Score > player1Score ? 'Win' : (player2Score === player1Score ? 'Draw' : 'Loss'),
+        sameTeam,
+        teamWhiteScore: matchDetails.team_white_score,
+        teamBlueScore: matchDetails.team_blue_score,
+        player1EloChange: p1Match.new_elo !== p1Match.old_elo ? 
+          p1Match.new_elo - p1Match.old_elo : 
+          p1Match.new_elo_offense - p1Match.old_elo_offense,
+        player2EloChange: p2Match.new_elo !== p2Match.old_elo ? 
+          p2Match.new_elo - p2Match.old_elo : 
+          p2Match.new_elo_offense - p2Match.old_elo_offense,
+      };
+    }).filter(match => match !== null);
+
+    return headToHeadMatches;
+  } catch (error) {
+    console.error('Error fetching head-to-head matches:', error);
+    return [];
+  }
+}
