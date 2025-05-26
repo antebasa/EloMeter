@@ -885,57 +885,64 @@ export const PlayerComparison: React.FC = () => {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {teammateMatches.slice(0, 10).map((match, index) => (
-                    <Tr key={index}>
-                      <Td>{new Date(match.date).toLocaleDateString()}</Td>
-                      <Td textAlign="center">
-                        <Text
-                          fontWeight="bold"
-                          color={match.player1Result === 'Win' ? 'green.500' : 'red.500'}
-                        >
-                          {match.player1Score}
-                        </Text>
-                      </Td>
-                      <Td textAlign="center">
-                        <Text
-                          fontWeight="bold"
-                          color={match.player1Result === 'Win' ? 'red.500' : 'green.500'}
-                        >
-                          {match.player2Score}
-                        </Text>
-                      </Td>
-                      <Td textAlign="center">
-                        <Tag
-                          size="sm"
-                          colorScheme={match.player1Result === 'Win' ? 'green' : 'red'}
-                        >
-                          {match.player1Result === 'Win' ? 'Team Win' : 'Team Loss'}
-                        </Tag>
-                      </Td>
-                      <Td textAlign="center">
-                        <Text fontSize="sm">{match.player1Score}</Text>
-                      </Td>
-                      <Td textAlign="center">
-                        <Text fontSize="sm">{match.player2Score}</Text>
-                      </Td>
-                      <Td textAlign="center">
-                        <VStack spacing={0}>
+                  {teammateMatches.slice(0, 10).map((match, index) => {
+                    // Determine the actual team scores based on the match result
+                    const teamWon = match.player1Result === 'Win';
+                    const teamScore = teamWon ? Math.max(match.teamWhiteScore, match.teamBlueScore) : Math.min(match.teamWhiteScore, match.teamBlueScore);
+                    const opponentScore = teamWon ? Math.min(match.teamWhiteScore, match.teamBlueScore) : Math.max(match.teamWhiteScore, match.teamBlueScore);
+                    
+                    return (
+                      <Tr key={index}>
+                        <Td>{new Date(match.date).toLocaleDateString()}</Td>
+                        <Td textAlign="center">
                           <Text
-                            fontSize="xs"
-                            color={match.player1EloChange >= 0 ? 'green.500' : 'red.500'}
+                            fontWeight="bold"
+                            color={teamWon ? 'green.500' : 'red.500'}
                           >
-                            {match.player1EloChange >= 0 ? '+' : ''}{Math.round(match.player1EloChange)}
+                            {teamScore}
                           </Text>
+                        </Td>
+                        <Td textAlign="center">
                           <Text
-                            fontSize="xs"
-                            color={match.player2EloChange >= 0 ? 'green.500' : 'red.500'}
+                            fontWeight="bold"
+                            color={teamWon ? 'red.500' : 'green.500'}
                           >
-                            {match.player2EloChange >= 0 ? '+' : ''}{Math.round(match.player2EloChange)}
+                            {opponentScore}
                           </Text>
-                        </VStack>
-                      </Td>
-                    </Tr>
-                  ))}
+                        </Td>
+                        <Td textAlign="center">
+                          <Tag
+                            size="sm"
+                            colorScheme={teamWon ? 'green' : 'red'}
+                          >
+                            {teamWon ? 'Team Win' : 'Team Loss'}
+                          </Tag>
+                        </Td>
+                        <Td textAlign="center">
+                          <Text fontSize="sm">{match.player1Score}</Text>
+                        </Td>
+                        <Td textAlign="center">
+                          <Text fontSize="sm">{match.player2Score}</Text>
+                        </Td>
+                        <Td textAlign="center">
+                          <VStack spacing={0}>
+                            <Text
+                              fontSize="xs"
+                              color={match.player1EloChange >= 0 ? 'green.500' : 'red.500'}
+                            >
+                              {match.player1EloChange >= 0 ? '+' : ''}{Math.round(match.player1EloChange)}
+                            </Text>
+                            <Text
+                              fontSize="xs"
+                              color={match.player2EloChange >= 0 ? 'green.500' : 'red.500'}
+                            >
+                              {match.player2EloChange >= 0 ? '+' : ''}{Math.round(match.player2EloChange)}
+                            </Text>
+                          </VStack>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
                 </Tbody>
               </Table>
               {teammateMatches.length > 10 && (
