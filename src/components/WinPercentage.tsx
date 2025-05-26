@@ -81,8 +81,6 @@ export const WinPercentage: React.FC = () => {
 
   const cardBg = useColorModeValue('white', 'gray.700');
   const textColor = useColorModeValue('gray.600', 'gray.300');
-  const tableBg = useColorModeValue("white", "gray.750");
-  const headerBg = useColorModeValue("gray.50", "gray.800");
   const rowHoverBg = useColorModeValue("gray.100", "gray.700");
   const playerNameColor = useColorModeValue("gray.800", "whiteAlpha.900");
 
@@ -360,7 +358,6 @@ export const WinPercentage: React.FC = () => {
 
   const renderPlayerTable = (players: PlayerTeamStats[], position: 'defense' | 'offense', teamColor: 'blue' | 'white') => {
     const sortedPlayers = sortPlayers(players, position, teamColor);
-    const sortConfig = getSortConfig(position, teamColor);
     const headerColor = teamColor === 'blue' ? 'blue.400' : 'gray.300';
 
     return (
