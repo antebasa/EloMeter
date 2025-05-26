@@ -60,6 +60,7 @@ import type {User} from '../lib/supabase';
 import {getHeadToHeadMatches, getPlayerEloHistory, getPlayerMatchHistory, getUsers} from '../lib/supabase';
 
 interface PlayerWithStats extends User {
+  avatar_url?: string;
   winPercentage: number;
   winPercentageOffense?: number;
   winPercentageDefense?: number;
