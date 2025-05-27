@@ -16,8 +16,7 @@ import {
   Text,
   VStack
 } from "@chakra-ui/react";
-import { TriangleUpIcon, TriangleDownIcon } from '@chakra-ui/icons';
-import { GiShield, GiCrossedSwords } from 'react-icons/gi';
+import {GiCrossedSwords, GiShield} from 'react-icons/gi';
 import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
 import type {User as SupabaseUser} from "../lib/supabase";
 import {getPlayerEloHistory, getPlayerMatchHistory, getUsers} from "../lib/supabase";
@@ -202,12 +201,12 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
   }
 
   return (
-    <Box 
-      maxWidth={{ base: "100%", md: "900px" }} 
-      mx="auto" 
-      p={{ base: 4, md: 6 }} 
-      borderRadius="lg" 
-      boxShadow="md" 
+    <Box
+      maxWidth={{ base: "100%", md: "900px" }}
+      mx="auto"
+      p={{ base: 4, md: 6 }}
+      borderRadius="lg"
+      boxShadow="md"
       bg="white"
     >
       <Flex direction={{ base: "column", md: "row" }} align={{ base: "flex-start", md: "center" }} mb={6}>
@@ -243,10 +242,10 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
               {playerStats.played} matches played ({playerStats.wins} wins, {playerStats.losses} losses)
             </Text>
           </Box>
-          <Flex 
-            direction={{ base: "column", sm: "row" }} 
-            justify="space-around" 
-            flex="1" 
+          <Flex
+            direction={{ base: "column", sm: "row" }}
+            justify="space-around"
+            flex="1"
             gap={{ base: 2, sm: 4 }}
             wrap="wrap"
           >
@@ -391,9 +390,9 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                 <AlertDescription>No match history available for this player.</AlertDescription>
               </Alert>
             ) : (
-              <Box 
-                display="grid" 
-                gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} 
+              <Box
+                display="grid"
+                gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }}
                 gap={3}
               >
                 {matchHistory.map((match, index) => {
@@ -415,7 +414,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                   const opponentTeam = parseOpponentTeam(match.opponents || "");
                   const currentPlayerName = currentPlayerData?.name || "";
                   const teammateName = match.teammate || "";
-                  
+
                   // Use the role information directly from the match data
                   const currentPlayerIsDefender = match.currentPlayerIsDefender;
 
@@ -427,7 +426,7 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                       bg={isWin ? "green.50" : isDraw ? "gray.50" : "red.50"}
                       border="2px solid"
                       borderColor={isWin ? "green.200" : isDraw ? "gray.200" : "red.200"}
-                      _hover={{ 
+                      _hover={{
                         borderColor: isWin ? "green.400" : isDraw ? "gray.400" : "red.400",
                         transform: "translateY(-1px)"
                       }}
@@ -443,14 +442,14 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                         <VStack spacing={1} w="100%">
                           {/* Defender always on top */}
                           <HStack spacing={2} justify="center">
-                            <Icon 
-                              as={GiShield} 
-                              boxSize={4} 
-                              color="blue.600" 
+                            <Icon
+                              as={GiShield}
+                              boxSize={4}
+                              color="blue.600"
                             />
-                            <Text 
-                              fontSize="sm" 
-                              fontWeight={currentPlayerIsDefender ? "bold" : "medium"} 
+                            <Text
+                              fontSize="sm"
+                              fontWeight={currentPlayerIsDefender ? "bold" : "medium"}
                               color="blue.700"
                             >
                               {currentPlayerIsDefender ? currentPlayerName : teammateName}
@@ -459,14 +458,14 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                           {/* Offense always underneath */}
                           {teammateName && teammateName !== "-" && (
                             <HStack spacing={2} justify="center">
-                              <Icon 
-                                as={GiCrossedSwords} 
-                                boxSize={4} 
-                                color="orange.600" 
+                              <Icon
+                                as={GiCrossedSwords}
+                                boxSize={4}
+                                color="orange.600"
                               />
-                              <Text 
-                                fontSize="sm" 
-                                fontWeight={!currentPlayerIsDefender ? "bold" : "medium"} 
+                              <Text
+                                fontSize="sm"
+                                fontWeight={!currentPlayerIsDefender ? "bold" : "medium"}
                                 color="blue.600"
                               >
                                 {currentPlayerIsDefender ? teammateName : currentPlayerName}
@@ -485,10 +484,10 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                             .sort((a, b) => (b.isDefender ? 1 : 0) - (a.isDefender ? 1 : 0))
                             .map((opponent, idx) => (
                             <HStack key={idx} spacing={2} justify="center">
-                              <Icon 
-                                as={opponent.isDefender ? GiShield : GiCrossedSwords} 
-                                boxSize={4} 
-                                color={opponent.isDefender ? "blue.600" : "orange.600"} 
+                              <Icon
+                                as={opponent.isDefender ? GiShield : GiCrossedSwords}
+                                boxSize={4}
+                                color={opponent.isDefender ? "blue.600" : "orange.600"}
                               />
                               <Text fontSize="sm" fontWeight="medium" color="red.700">
                                 {opponent.name}

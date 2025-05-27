@@ -1,42 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
+  Badge,
   Box,
+  Button,
   Card,
   CardBody,
   CardHeader,
-  Heading,
-  VStack,
-  HStack,
-  Text,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
-  SliderMark,
+  Divider,
   FormControl,
   FormLabel,
-  Select,
+  Heading,
+  HStack,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
   NumberInput,
   NumberInputField,
   NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
-  Button,
-  Divider,
+  Select,
   SimpleGrid,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  Badge,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  useColorModeValue
+  Slider,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderTrack,
+  Text,
+  useColorModeValue,
+  VStack
 } from '@chakra-ui/react';
-import { getUsers, type User } from '../lib/supabase';
-import { calculateImprovedElo, type EloParameters, DEFAULT_ELO_PARAMETERS } from '../lib/improvedElo';
+import {getUsers, type User} from '../lib/supabase';
+import {calculateImprovedElo, DEFAULT_ELO_PARAMETERS, type EloParameters} from '../lib/improvedElo';
 
 interface TeamComposition {
   defense: User | null;
@@ -147,7 +142,7 @@ const EloTestPage: React.FC = () => {
         <Heading size="lg" textAlign="center">
           ELO Algorithm Test Laboratory - Live Mode
         </Heading>
-        
+
         <Alert status="info">
           <AlertIcon />
           <Box>
@@ -428,7 +423,7 @@ const EloTestPage: React.FC = () => {
                     <Text fontSize="sm">Select all players to see live ELO calculations</Text>
                   </Alert>
                 )}
-                
+
                 {(team1.defense && team1.offense && team2.defense && team2.offense) && (
                   <Alert status="success" borderRadius="md">
                     <AlertIcon />
@@ -467,7 +462,7 @@ const EloTestPage: React.FC = () => {
                         </Badge>
                       </HStack>
                     </Box>
-                    
+
                     <Box p={4} borderRadius="md" bg={useColorModeValue('red.50', 'red.900')}>
                       <Text fontWeight="bold" color="red.600">Team 2</Text>
                       <HStack justify="space-between">
@@ -506,4 +501,4 @@ const EloTestPage: React.FC = () => {
   );
 };
 
-export default EloTestPage; 
+export default EloTestPage;
