@@ -24,11 +24,17 @@ import {
   ModalCloseButton,
   Alert,
   AlertIcon,
-  AlertDescription
+  AlertDescription,
+  VStack,
+  HStack,
+  Badge,
+  Divider
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { getUsers, saveMatch } from "../lib/supabase";
 import type { User, MatchData } from "../lib/supabase";
+import { calculateImprovedEloFromMatchData } from "../lib/improvedElo";
+import type { EloCalculationResult } from "../lib/improvedElo";
 
 interface EnterScoreProps {
   onSubmit?: (formData: MatchData) => void;
@@ -40,6 +46,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [eloChanges, setEloChanges] = useState<EloCalculationResult | null>(null);
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
@@ -117,6 +124,21 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
       return;
     }
 
+    // Calculate ELO changes before opening modal
+    try {
+      const userMap: Record<number, User> = {};
+      users.forEach(user => {
+        userMap[user.id] = user;
+      });
+
+      const eloResult = await calculateImprovedEloFromMatchData(formData, userMap);
+      setEloChanges(eloResult);
+    } catch (error) {
+      console.error("Error calculating ELO changes:", error);
+      setError("Failed to calculate ELO changes");
+      return;
+    }
+
     // Open confirmation modal
     onOpen();
   };
@@ -153,13 +175,16 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
         team2Score: 0
       });
 
+      // Clear ELO changes
+      setEloChanges(null);
+
       // Call the onSubmit callback if provided
       if (onSubmit) {
         onSubmit(formData);
       }
 
       // Close the modal
-      onClose();
+      handleModalClose();
     } catch (error) {
       console.error("Error saving match:", error);
       setError(error instanceof Error ? error.message : "An unknown error occurred");
@@ -179,6 +204,11 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
     if (!id) return "";
     const player = users.find(user => user.id.toString() === id);
     return player ? player.name : "";
+  };
+
+  const handleModalClose = () => {
+    setEloChanges(null);
+    onClose();
   };
 
   return (
@@ -334,7 +364,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
       </Box>
 
       {/* Confirmation Modal */}
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal isOpen={isOpen} onClose={handleModalClose}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Confirm Match Result</ModalHeader>
@@ -357,12 +387,71 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
               </Box>
             </SimpleGrid>
 
+            {/* ELO Changes Display */}
+            {eloChanges && (
+              <>
+                <Divider my={4} />
+                <VStack spacing={3} align="stretch">
+                  <Text fontWeight="bold" textAlign="center" color="blue.600">
+                    ELO Rating Changes
+                  </Text>
+                  
+                  <HStack justify="space-between" align="center">
+                    <VStack spacing={1} align="start" flex={1}>
+                      <Text fontSize="sm" fontWeight="semibold">Team 1 Players</Text>
+                      <HStack>
+                        <Text fontSize="sm">{getPlayerName(formData.team1Defense)} (D):</Text>
+                        <Badge 
+                          colorScheme={eloChanges.team1DefenseChange >= 0 ? "green" : "red"}
+                          variant="solid"
+                        >
+                          {eloChanges.team1DefenseChange >= 0 ? '+' : ''}{eloChanges.team1DefenseChange}
+                        </Badge>
+                      </HStack>
+                      <HStack>
+                        <Text fontSize="sm">{getPlayerName(formData.team1Offense)} (O):</Text>
+                        <Badge 
+                          colorScheme={eloChanges.team1OffenseChange >= 0 ? "green" : "red"}
+                          variant="solid"
+                        >
+                          {eloChanges.team1OffenseChange >= 0 ? '+' : ''}{eloChanges.team1OffenseChange}
+                        </Badge>
+                      </HStack>
+                    </VStack>
+
+                    <VStack spacing={1} align="start" flex={1}>
+                      <Text fontSize="sm" fontWeight="semibold">Team 2 Players</Text>
+                      <HStack>
+                        <Text fontSize="sm">{getPlayerName(formData.team2Defense)} (D):</Text>
+                        <Badge 
+                          colorScheme={eloChanges.team2DefenseChange >= 0 ? "green" : "red"}
+                          variant="solid"
+                        >
+                          {eloChanges.team2DefenseChange >= 0 ? '+' : ''}{eloChanges.team2DefenseChange}
+                        </Badge>
+                      </HStack>
+                      <HStack>
+                        <Text fontSize="sm">{getPlayerName(formData.team2Offense)} (O):</Text>
+                        <Badge 
+                          colorScheme={eloChanges.team2OffenseChange >= 0 ? "green" : "red"}
+                          variant="solid"
+                        >
+                          {eloChanges.team2OffenseChange >= 0 ? '+' : ''}{eloChanges.team2OffenseChange}
+                        </Badge>
+                      </HStack>
+                    </VStack>
+                  </HStack>
+                </VStack>
+                <Divider my={4} />
+              </>
+            )}
+
             <Text fontSize="sm" color="gray.500">
               This will update player statistics and ELO ratings based on the result.
             </Text>
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="red" mr={3} onClick={onClose} isDisabled={saving}>
+            <Button colorScheme="red" mr={3} onClick={handleModalClose} isDisabled={saving}>
               Cancel
             </Button>
             <Button colorScheme="green" onClick={confirmAndSaveMatch} isLoading={saving}>
