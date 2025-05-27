@@ -3,22 +3,29 @@ import {
   Alert,
   AlertDescription,
   AlertIcon,
-  Badge,
   Box,
   Checkbox,
   Flex,
   FormControl,
   Heading,
   HStack,
+  Icon,
   Select,
   Skeleton,
   Spinner,
   Text,
   VStack
 } from "@chakra-ui/react";
+import { TriangleUpIcon, TriangleDownIcon } from '@chakra-ui/icons';
+import { GiShield, GiCrossedSwords } from 'react-icons/gi';
 import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
-import type {User} from "../lib/supabase";
+import type {User as SupabaseUser} from "../lib/supabase";
 import {getPlayerEloHistory, getPlayerMatchHistory, getUsers} from "../lib/supabase";
+
+// Extend User type to include avatar_url
+interface User extends SupabaseUser {
+  avatar_url?: string;
+}
 
 // Helper function to format dates
 const formatDate = (dateString: string) => {
@@ -87,6 +94,8 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
           getPlayerMatchHistory(selectedPlayer),
           getPlayerEloHistory(selectedPlayer)
         ]);
+
+        // Role information is now included in the match data directly
 
         console.log('Received ELO history data:', elo);
 
@@ -382,57 +391,125 @@ export const History = ({ selectedPlayerIdProp, onDoneWithSelectedPlayer }: Hist
                 <AlertDescription>No match history available for this player.</AlertDescription>
               </Alert>
             ) : (
-              <VStack spacing={2} align="stretch">
+              <Box 
+                display="grid" 
+                gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} 
+                gap={3}
+              >
                 {matchHistory.map((match, index) => {
-                  const result = match.result; // Win, Draw, or Loss
+                  const result = match.result;
                   const isWin = result === "Win";
                   const isDraw = result === "Draw";
+                  const score = match.score || "0-0";
+
+                  // Parse opponent team to get roles
+                  const parseOpponentTeam = (opponentString: string) => {
+                    if (!opponentString) return [];
+                    return opponentString.split(' & ').map(member => {
+                      const isDefender = member.includes('(D)');
+                      const name = member.replace(/\s*\([DO]\)\s*/g, '').trim();
+                      return { name, isDefender };
+                    });
+                  };
+
+                  const opponentTeam = parseOpponentTeam(match.opponents || "");
+                  const currentPlayerName = currentPlayerData?.name || "";
+                  const teammateName = match.teammate || "";
+                  
+                  // Use the role information directly from the match data
+                  const currentPlayerIsDefender = match.currentPlayerIsDefender;
 
                   return (
-                    <Flex
+                    <Box
                       key={index}
-                      p={{ base: 2, md: 3 }}
+                      p={3}
                       borderRadius="md"
-                      bg={isWin ? "blue.50" : isDraw ? "gray.100" : "gray.50"}
-                      borderLeft={`4px solid ${isWin ? "#3182CE" : isDraw ? "#718096" : "#A0AEC0"}`}
-                      justify="space-between"
-                      align="center"
-                      direction={{ base: "column", sm: "row" }}
-                      gap={{ base: 2, sm: 0 }}
+                      bg={isWin ? "green.50" : isDraw ? "gray.50" : "red.50"}
+                      border="2px solid"
+                      borderColor={isWin ? "green.200" : isDraw ? "gray.200" : "red.200"}
+                      _hover={{ 
+                        borderColor: isWin ? "green.400" : isDraw ? "gray.400" : "red.400",
+                        transform: "translateY(-1px)"
+                      }}
+                      transition="all 0.2s ease"
                     >
-                      <VStack align={{ base: "center", sm: "flex-start" }} spacing={0} flex="1">
-                        <Text fontWeight="medium">
-                          <Text as="span" fontWeight="bold">
-                            {currentPlayerData?.name || ""}
-                          </Text>
-                          {match.teammate && (
-                            <>
-                              {" & "}
-                              <Text as="span" fontWeight="normal">{match.teammate}</Text>
-                            </>
-                          )}
-                          {" vs "}
-                          <Text as="span" fontWeight="normal">{match.opponents}</Text>
+                      <VStack spacing={3}>
+                        {/* Score */}
+                        <Text fontSize="xl" fontWeight="bold" color="gray.800">
+                          {score}
                         </Text>
-                        <Text fontSize="sm" color="gray.600">{formatDate(match.date)}</Text>
-                      </VStack>
 
-                      <HStack>
-                        <Badge colorScheme={isWin ? "green" : isDraw ? "gray" : "red"}>
-                          {result}
-                        </Badge>
-                        <Text fontWeight="medium">{match.score}</Text>
+                        {/* Your Team - Always show defender first, then offense */}
+                        <VStack spacing={1} w="100%">
+                          {/* Defender always on top */}
+                          <HStack spacing={2} justify="center">
+                            <Icon 
+                              as={GiShield} 
+                              boxSize={4} 
+                              color="blue.600" 
+                            />
+                            <Text 
+                              fontSize="sm" 
+                              fontWeight={currentPlayerIsDefender ? "bold" : "medium"} 
+                              color="blue.700"
+                            >
+                              {currentPlayerIsDefender ? currentPlayerName : teammateName}
+                            </Text>
+                          </HStack>
+                          {/* Offense always underneath */}
+                          {teammateName && teammateName !== "-" && (
+                            <HStack spacing={2} justify="center">
+                              <Icon 
+                                as={GiCrossedSwords} 
+                                boxSize={4} 
+                                color="orange.600" 
+                              />
+                              <Text 
+                                fontSize="sm" 
+                                fontWeight={!currentPlayerIsDefender ? "bold" : "medium"} 
+                                color="blue.600"
+                              >
+                                {currentPlayerIsDefender ? teammateName : currentPlayerName}
+                              </Text>
+                            </HStack>
+                          )}
+                        </VStack>
+
+                        {/* VS */}
+                        <Text fontSize="xs" color="gray.500" fontWeight="bold">VS</Text>
+
+                        {/* Opponents - Always show defender first, then offense */}
+                        <VStack spacing={1} w="100%">
+                          {/* Sort opponents so defender is always first */}
+                          {opponentTeam
+                            .sort((a, b) => (b.isDefender ? 1 : 0) - (a.isDefender ? 1 : 0))
+                            .map((opponent, idx) => (
+                            <HStack key={idx} spacing={2} justify="center">
+                              <Icon 
+                                as={opponent.isDefender ? GiShield : GiCrossedSwords} 
+                                boxSize={4} 
+                                color={opponent.isDefender ? "blue.600" : "orange.600"} 
+                              />
+                              <Text fontSize="sm" fontWeight="medium" color="red.700">
+                                {opponent.name}
+                              </Text>
+                            </HStack>
+                          ))}
+                        </VStack>
+
+                        {/* ELO Change */}
                         <Text
-                          color={(match.eloChange > 0) ? "green.500" : "red.500"}
+                          fontSize="lg"
                           fontWeight="bold"
+                          color={match.eloChange > 0 ? "green.600" : match.eloChange < 0 ? "red.600" : "gray.600"}
                         >
                           {match.eloChange > 0 ? `+${match.eloChange}` : match.eloChange}
                         </Text>
-                      </HStack>
-                    </Flex>
+                      </VStack>
+                    </Box>
                   );
                 })}
-              </VStack>
+              </Box>
             )}
           </Box>
         </>

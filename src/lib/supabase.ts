@@ -447,6 +447,9 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
         }
     }
 
+    // Determine if current player was defender or offense
+    const currentPlayerIsDefender = playerTeamDetails.player_defense_id === userId;
+
     return {
       id: pms.id,
       match_db_id: matchDetails.id,
@@ -462,7 +465,8 @@ export async function getPlayerMatchHistory(userId: number): Promise<any[]> {
       opponents: opponentsString,
       player_team_id_in_match: playerTeamDetails.id,
       match_details_white_team_id: matchDetails.white_team_id,
-      match_details_blue_team_id: matchDetails.blue_team_id
+      match_details_blue_team_id: matchDetails.blue_team_id,
+      currentPlayerIsDefender: currentPlayerIsDefender
     };
   }).filter(Boolean);
 }
