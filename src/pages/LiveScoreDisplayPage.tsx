@@ -1,47 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  Badge,
   Box,
   Button,
-  VStack,
-  HStack,
-  Text,
-  useToast,
-  Heading,
-  Badge,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
   Card,
   CardBody,
-  Divider,
-  IconButton,
-  Flex,
   Code,
-  useClipboard,
-  Tooltip,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
+  Divider,
+  Flex,
+  Heading,
+  HStack,
+  IconButton,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
   Progress,
   SimpleGrid,
+  Spinner,
+  Text,
+  Tooltip,
+  useClipboard,
+  useDisclosure,
+  useToast,
+  VStack,
 } from '@chakra-ui/react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowBackIcon, CopyIcon, ExternalLinkIcon } from '@chakra-ui/icons';
-import { supabase } from '../supabaseClient';
-import { saveMatch } from '../lib/supabase';
-import { useLiveMatch } from '../hooks/useLiveMatch';
-import { calculateImprovedEloFromMatchData } from '../lib/improvedElo';
-import type { User } from '../lib/supabase';
-import type { EloCalculationResult } from '../lib/improvedElo';
+import {useNavigate, useParams} from 'react-router-dom';
+import {ArrowBackIcon, CopyIcon, ExternalLinkIcon} from '@chakra-ui/icons';
+import {supabase} from '../supabaseClient';
+import type {User} from '../lib/supabase';
+import {saveMatch} from '../lib/supabase';
+import {useLiveMatch} from '../hooks/useLiveMatch';
+import type {EloCalculationResult} from '../lib/improvedElo';
+import {calculateImprovedEloFromMatchData} from '../lib/improvedElo';
 
 const LiveScoreDisplayPage: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
@@ -61,7 +57,7 @@ const LiveScoreDisplayPage: React.FC = () => {
   const baseUrl = window.location.origin;
   const whiteTeamUrl = `${baseUrl}/app/live-match/${matchId}/white`;
   const blueTeamUrl = `${baseUrl}/app/live-match/${matchId}/blue`;
-  
+
   const { onCopy: onCopyWhite, hasCopied: hasCopiedWhite } = useClipboard(whiteTeamUrl);
   const { onCopy: onCopyBlue, hasCopied: hasCopiedBlue } = useClipboard(blueTeamUrl);
 
@@ -130,7 +126,7 @@ const LiveScoreDisplayPage: React.FC = () => {
     // 2. Proximity to victory factor (35% weight)
     const whiteProximity = match.white_score / 10; // How close white is to winning
     const blueProximity = match.blue_score / 10;   // How close blue is to winning
-    
+
     // If a team is very close to 10, they have a big advantage
     let proximityFactor = 0.5; // neutral
     if (whiteProximity > 0.7 || blueProximity > 0.7) {
@@ -144,21 +140,21 @@ const LiveScoreDisplayPage: React.FC = () => {
     // 3. Momentum factor (25% weight) - based on recent performance
     let momentumFactor = 0.5; // neutral
     const totalScore = match.white_score + match.blue_score;
-    
+
     if (totalScore >= 3) {
       // Calculate momentum based on score ratio with recency bias
       const whiteRatio = match.white_score / totalScore;
-      
+
       // If the game is lopsided, momentum matters more
       const scoreDiff = Math.abs(match.white_score - match.blue_score);
       const lopsidedMultiplier = Math.min(1 + (scoreDiff * 0.2), 2.0);
-      
+
       momentumFactor = whiteRatio * lopsidedMultiplier;
       momentumFactor = Math.max(0.1, Math.min(0.9, momentumFactor)); // Cap between 10-90%
     }
 
     // 4. Combine all factors with weights
-    const combinedWhiteProb = 
+    const combinedWhiteProb =
       baseWhiteWinProb * 0.40 +      // ELO base probability
       proximityFactor * 0.35 +       // How close to winning
       momentumFactor * 0.25;         // Current momentum
@@ -226,7 +222,7 @@ const LiveScoreDisplayPage: React.FC = () => {
         // Mark the live match as completed
         await supabase
           .from('live_matches')
-          .update({ 
+          .update({
             status: 'completed',
             confirmed_by_white: true,
             confirmed_by_blue: true,
@@ -311,7 +307,7 @@ const LiveScoreDisplayPage: React.FC = () => {
   }
 
   const isGameFinished = match.white_score >= 10 || match.blue_score >= 10;
-  const winner = match.white_score > match.blue_score ? 'White' : 
+  const winner = match.white_score > match.blue_score ? 'White' :
                  match.blue_score > match.white_score ? 'Blue' : 'Tie';
 
   return (
@@ -365,7 +361,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                   <Text fontSize="md" fontWeight="bold" color="green.700" textAlign="center">
                     🎯 Live Win Probabilities
                   </Text>
-                  
+
                   {/* Percentage Labels */}
                   <HStack justify="space-between" w="100%" px={2}>
                     <VStack spacing={0}>
@@ -384,9 +380,9 @@ const LiveScoreDisplayPage: React.FC = () => {
 
                   {/* Horizontal Progress Bar */}
                   <Box w="100%" position="relative">
-                    <Progress 
-                      value={winProbabilities.whiteWinProb * 100} 
-                      size="lg" 
+                    <Progress
+                      value={winProbabilities.whiteWinProb * 100}
+                      size="lg"
                       colorScheme="gray"
                       bg="blue.200"
                       borderRadius="full"
@@ -491,14 +487,14 @@ const LiveScoreDisplayPage: React.FC = () => {
             <Text fontSize="sm" color="gray.600" textAlign="center" mb={4}>
               Players can scan QR codes or copy links to control the score from their mobile devices
             </Text>
-            
+
             <VStack spacing={4}>
               {/* White Team Control */}
-              <Box 
-                p={4} 
-                borderRadius="lg" 
-                bg="gray.50" 
-                borderWidth="1px" 
+              <Box
+                p={4}
+                borderRadius="lg"
+                bg="gray.50"
+                borderWidth="1px"
                 borderColor="gray.200"
                 w="100%"
               >
@@ -507,7 +503,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                     <Text fontWeight="bold" color="gray.700">White Team Control</Text>
                     <Badge colorScheme="gray">WHITE</Badge>
                   </HStack>
-                  
+
                   <HStack spacing={2} w="100%">
                     <Button
                       flex={1}
@@ -527,7 +523,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                       />
                     </Tooltip>
                   </HStack>
-                  
+
                   <Code fontSize="xs" p={2} borderRadius="md" w="100%" textAlign="center">
                     {whiteTeamUrl}
                   </Code>
@@ -535,11 +531,11 @@ const LiveScoreDisplayPage: React.FC = () => {
               </Box>
 
               {/* Blue Team Control */}
-              <Box 
-                p={4} 
-                borderRadius="lg" 
-                bg="blue.50" 
-                borderWidth="1px" 
+              <Box
+                p={4}
+                borderRadius="lg"
+                bg="blue.50"
+                borderWidth="1px"
                 borderColor="blue.200"
                 w="100%"
               >
@@ -548,7 +544,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                     <Text fontWeight="bold" color="blue.700">Blue Team Control</Text>
                     <Badge colorScheme="blue">BLUE</Badge>
                   </HStack>
-                  
+
                   <HStack spacing={2} w="100%">
                     <Button
                       flex={1}
@@ -568,7 +564,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                       />
                     </Tooltip>
                   </HStack>
-                  
+
                   <Code fontSize="xs" p={2} borderRadius="md" w="100%" textAlign="center">
                     {blueTeamUrl}
                   </Code>
@@ -579,7 +575,7 @@ const LiveScoreDisplayPage: React.FC = () => {
             <Alert status="info" mt={4} borderRadius="lg">
               <AlertIcon />
               <AlertDescription fontSize="sm">
-                <strong>How to use:</strong> Share the links above with team players. 
+                <strong>How to use:</strong> Share the links above with team players.
                 They can open them on their phones to control the score in real-time.
               </AlertDescription>
             </Alert>
@@ -602,7 +598,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                   </Text>
                 )}
               </VStack>
-              
+
               <VStack align="end" spacing={1}>
                 <Text fontSize="xs" color="gray.500">Match ID: {matchId}</Text>
                 <Text fontSize="xs" color="gray.500">
@@ -638,7 +634,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                       <Heading size="md" color="blue.700" textAlign="center">
                         📊 ELO Rating Changes Preview
                       </Heading>
-                      
+
                       <SimpleGrid columns={2} spacing={4} w="100%">
                         {/* White Team Changes */}
                         <VStack spacing={3} p={3} bg="white" borderRadius="md" borderWidth="1px">
@@ -646,7 +642,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                           <VStack spacing={2}>
                             <HStack justify="space-between" w="100%">
                               <Text fontSize="sm">{getUserName(match.white_team_defense_id)} (D):</Text>
-                              <Badge 
+                              <Badge
                                 colorScheme={eloPreview.team1DefenseChange >= 0 ? 'green' : 'red'}
                                 fontSize="sm"
                               >
@@ -655,7 +651,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                             </HStack>
                             <HStack justify="space-between" w="100%">
                               <Text fontSize="sm">{getUserName(match.white_team_offense_id)} (O):</Text>
-                              <Badge 
+                              <Badge
                                 colorScheme={eloPreview.team1OffenseChange >= 0 ? 'green' : 'red'}
                                 fontSize="sm"
                               >
@@ -671,7 +667,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                           <VStack spacing={2}>
                             <HStack justify="space-between" w="100%">
                               <Text fontSize="sm">{getUserName(match.blue_team_defense_id)} (D):</Text>
-                              <Badge 
+                              <Badge
                                 colorScheme={eloPreview.team2DefenseChange >= 0 ? 'green' : 'red'}
                                 fontSize="sm"
                               >
@@ -680,7 +676,7 @@ const LiveScoreDisplayPage: React.FC = () => {
                             </HStack>
                             <HStack justify="space-between" w="100%">
                               <Text fontSize="sm">{getUserName(match.blue_team_offense_id)} (O):</Text>
-                              <Badge 
+                              <Badge
                                 colorScheme={eloPreview.team2OffenseChange >= 0 ? 'green' : 'red'}
                                 fontSize="sm"
                               >
@@ -721,4 +717,4 @@ const LiveScoreDisplayPage: React.FC = () => {
   );
 };
 
-export default LiveScoreDisplayPage; 
+export default LiveScoreDisplayPage;

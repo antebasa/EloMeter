@@ -14,7 +14,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Constants
 const DEFAULT_ELO = 1400;
-const SCORE_DIFF_MULTIPLIER = 0.15;
 
 export interface User {
   id: number;
