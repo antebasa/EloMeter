@@ -1,33 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  Badge,
   Box,
   Button,
-  VStack,
-  HStack,
-  Text,
-  Select,
-  useToast,
-  Heading,
   Card,
   CardBody,
   Divider,
-  Badge,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  SimpleGrid,
+  Heading,
+  HStack,
   IconButton,
-  Flex,
-  useClipboard,
+  Select,
+  SimpleGrid,
+  Spinner,
+  Text,
   Tooltip,
-  Code,
+  useClipboard,
+  useToast,
+  VStack,
 } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
-import { ExternalLinkIcon, CopyIcon, ViewIcon } from '@chakra-ui/icons';
-import { supabase } from '../supabaseClient';
-import { getUsers } from '../lib/supabase';
-import type { User } from '../lib/supabase';
+import {useNavigate} from 'react-router-dom';
+import {CopyIcon, ExternalLinkIcon, ViewIcon} from '@chakra-ui/icons';
+import {supabase} from '../supabaseClient';
+import type {User} from '../lib/supabase';
+import {getUsers} from '../lib/supabase';
 
 interface LiveMatch {
   id: number;
@@ -52,7 +50,7 @@ const LiveMatchPage: React.FC = () => {
     blueDefense: '',
     blueOffense: '',
   });
-  
+
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -103,7 +101,7 @@ const LiveMatchPage: React.FC = () => {
 
   const validateTeamSelection = () => {
     const { whiteDefense, whiteOffense, blueDefense, blueOffense } = selectedPlayers;
-    
+
     if (!whiteDefense || !whiteOffense || !blueDefense || !blueOffense) {
       toast({
         title: 'Incomplete Team Selection',
@@ -117,7 +115,7 @@ const LiveMatchPage: React.FC = () => {
 
     const allPlayers = [whiteDefense, whiteOffense, blueDefense, blueOffense];
     const uniquePlayers = new Set(allPlayers);
-    
+
     if (uniquePlayers.size !== 4) {
       toast({
         title: 'Duplicate Player Selection',
@@ -191,16 +189,16 @@ const LiveMatchPage: React.FC = () => {
     <Box p={6} maxW="1000px" mx="auto">
       <VStack spacing={8} align="stretch">
         <Heading size="lg" textAlign="center">Live Match Control Center</Heading>
-        
+
         {/* Active Matches */}
         {activeMatches.length > 0 && (
           <Box>
             <Heading size="md" mb={4} color="green.600">🔴 Active Matches</Heading>
             <VStack spacing={4}>
               {activeMatches.map((match) => (
-                <ActiveMatchCard 
-                  key={match.id} 
-                  match={match} 
+                <ActiveMatchCard
+                  key={match.id}
+                  match={match}
                   getUserName={getUserName}
                   navigate={navigate}
                 />
@@ -214,7 +212,7 @@ const LiveMatchPage: React.FC = () => {
         {/* Create New Match */}
         <Box>
           <Heading size="md" mb={4} color="blue.600">➕ Create New Live Match</Heading>
-          
+
           <VStack spacing={6}>
             {/* Team Selection */}
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} w="100%">
@@ -344,7 +342,7 @@ const ActiveMatchCard: React.FC<{
   const baseUrl = window.location.origin;
   const whiteTeamUrl = `${baseUrl}/app/live-match/${match.id}/white`;
   const blueTeamUrl = `${baseUrl}/app/live-match/${match.id}/blue`;
-  
+
   const { onCopy: onCopyWhite, hasCopied: hasCopiedWhite } = useClipboard(whiteTeamUrl);
   const { onCopy: onCopyBlue, hasCopied: hasCopiedBlue } = useClipboard(blueTeamUrl);
 
@@ -368,7 +366,7 @@ const ActiveMatchCard: React.FC<{
                 </Text>
               </HStack>
             </VStack>
-            
+
             <VStack spacing={2}>
               <Badge colorScheme="green" fontSize="2xl" px={4} py={2} borderRadius="full">
                 {match.white_score} - {match.blue_score}
@@ -442,4 +440,4 @@ const ActiveMatchCard: React.FC<{
   );
 };
 
-export default LiveMatchPage; 
+export default LiveMatchPage;

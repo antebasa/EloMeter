@@ -1,11 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-import { calculateImprovedEloFromMatchData } from './improvedElo';
+import {createClient} from '@supabase/supabase-js';
+import {calculateImprovedEloFromMatchData} from './improvedElo';
 
 // Use environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-const SECOND_TIER_ELO = 1300
 
 // Basic check to ensure variables are loaded
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -16,7 +14,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Constants
 const DEFAULT_ELO = 1400;
-const K_FACTOR = 80;
 const SCORE_DIFF_MULTIPLIER = 0.15;
 
 export interface User {
@@ -98,20 +95,6 @@ export async function getUsers(): Promise<User[]> {
     return [];
   }
   return data || [];
-}
-
-// ELO calculation functions (no change needed here)
-function calculateExpectedScore(playerElo: number, opponentElo: number): number {
-  return 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
-}
-
-function updateElo(playerElo: number, expectedScore: number, actualScore: number, kFactor: number, scoreDiff: number | null = null): number {
-  let baseChange = kFactor * (actualScore - expectedScore);
-  if (scoreDiff !== null) {
-    const scoreImpact = Math.min(Math.abs(scoreDiff) * SCORE_DIFF_MULTIPLIER, 1.0);
-    baseChange *= (1 + scoreImpact);
-  }
-  return playerElo + baseChange;
 }
 
 // Helper to get or create a team
