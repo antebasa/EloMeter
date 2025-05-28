@@ -1,7 +1,7 @@
 import React, {useCallback, useState} from 'react';
 import {useAuth} from '../contexts/AuthContext';
 import {Box} from '@chakra-ui/react';
-// import { useNavigate } from 'react-router-dom'; // Keep if direct navigation is still needed
+import { useNavigate } from 'react-router-dom';
 // Imports from old App.tsx
 import {Layout} from '../components/Layout';
 import {EnterScore} from '../components/EnterScore';
@@ -16,7 +16,7 @@ import type {MatchData} from "../lib/supabase"; // Assuming supabase.ts exports 
 
 const DashboardPage: React.FC = () => {
     const { user } = useAuth();
-    // const navigate = useNavigate(); // Keep if needed
+    const navigate = useNavigate();
 
     // State and handlers from old App.tsx
     const [activeNavItem, setActiveNavItem] = useState<string>('EnterScore');
@@ -47,6 +47,10 @@ const DashboardPage: React.FC = () => {
                 }
             case 'MatchOdds':
                 return <MatchOdds />;
+            case 'LiveMatch':
+                // Navigate to the live match page
+                navigate('/app/live-match');
+                return null;
             case 'History':
                 return <History selectedPlayerIdProp={selectedPlayerIdForHistory} onDoneWithSelectedPlayer={clearSelectedPlayerIdForHistory} />;
             case 'OptimalTeams':
@@ -70,6 +74,7 @@ const DashboardPage: React.FC = () => {
     }, [
         user,
         activeNavItem,
+        navigate,
         handleSubmit,
         selectedPlayerIdForHistory,
         clearSelectedPlayerIdForHistory,

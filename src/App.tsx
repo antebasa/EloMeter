@@ -5,6 +5,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import DashboardPage from './pages/DashboardPage'; // Your main application component
+import LiveMatchPage from './pages/LiveMatchPage';
+import TeamControlPage from './pages/TeamControlPage';
+import LiveScoreDisplayPage from './pages/LiveScoreDisplayPage';
 
 // A component to handle redirection logic after login/logout
 const AuthRedirector: React.FC = () => {
@@ -36,6 +39,9 @@ function App() {
             <Route path="/app" element={<ProtectedRoute />}>
               {/* Nested routes are protected */}
               <Route index element={<DashboardPage />} /> 
+              <Route path="live-match" element={<LiveMatchPage />} />
+              <Route path="live-match/:matchId/display" element={<LiveScoreDisplayPage />} />
+              <Route path="live-match/:matchId/:team" element={<TeamControlPage />} />
               {/* Add other protected routes here as children of ProtectedRoute */}
               {/* e.g. <Route path="settings" element={<SettingsPage />} /> */}
             </Route>
