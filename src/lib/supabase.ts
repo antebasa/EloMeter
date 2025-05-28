@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { calculateImprovedEloFromMatchData } from './improvedElo';
 
 // Use environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -210,33 +211,20 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
     const whiteTeamId = await getOrCreateTeam(t1dId, t1oId, matchDateToUse);
     const blueTeamId = await getOrCreateTeam(t2dId, t2oId, matchDateToUse);
 
+    // Use improved ELO algorithm instead of old calculation
+    const eloResult = await calculateImprovedEloFromMatchData(matchData, userMap);
+
+    // Get current ELO values for database records
     const t1dDefElo = userMap[t1dId]?.elo_defense || DEFAULT_ELO;
     const t1oOffElo = userMap[t1oId]?.elo_offense || DEFAULT_ELO;
     const t2dDefElo = userMap[t2dId]?.elo_defense || DEFAULT_ELO;
     const t2oOffElo = userMap[t2oId]?.elo_offense || DEFAULT_ELO;
 
-    const team1Elo = (t1dDefElo + t1oOffElo) / 2;
-    const team2Elo = (t2dDefElo + t2oOffElo) / 2;
-
-    const t1Expected = calculateExpectedScore(team1Elo, team2Elo);
-    const t2Expected = 1 - t1Expected;
-    const totalScoreValue = matchData.team1Score + matchData.team2Score;
-    const t1Actual = totalScoreValue > 0 ? matchData.team1Score / totalScoreValue : 0.5;
-    const t2Actual = totalScoreValue > 0 ? matchData.team2Score / totalScoreValue : 0.5;
-    const scoreDiff = matchData.team1Score - matchData.team2Score;
-
-    let currentKFactor = K_FACTOR;
-    const team1HasPlayerBelow1400 = t1dDefElo < SECOND_TIER_ELO || t1oOffElo < SECOND_TIER_ELO;
-    const team2HasPlayerBelow1400 = t2dDefElo < SECOND_TIER_ELO || t2oOffElo < SECOND_TIER_ELO;
-
-    if ((team1HasPlayerBelow1400 && !team2HasPlayerBelow1400) || (!team1HasPlayerBelow1400 && team2HasPlayerBelow1400)) {
-      currentKFactor = K_FACTOR / 2;
-    }
-
-    const newT1dDefElo = Math.round(updateElo(t1dDefElo, t1Expected, t1Actual, currentKFactor, scoreDiff));
-    const newT1oOffElo = Math.round(updateElo(t1oOffElo, t1Expected, t1Actual, currentKFactor, scoreDiff));
-    const newT2dDefElo = Math.round(updateElo(t2dDefElo, t2Expected, t2Actual, currentKFactor, -scoreDiff));
-    const newT2oOffElo = Math.round(updateElo(t2oOffElo, t2Expected, t2Actual, currentKFactor, -scoreDiff));
+    // Calculate new ELO values using improved algorithm results
+    const newT1dDefElo = t1dDefElo + eloResult.team1DefenseChange;
+    const newT1oOffElo = t1oOffElo + eloResult.team1OffenseChange;
+    const newT2dDefElo = t2dDefElo + eloResult.team2DefenseChange;
+    const newT2oOffElo = t2oOffElo + eloResult.team2OffenseChange;
 
     const { data: matchInsertData, error: matchInsertError } = await supabase
       .from('Match')
