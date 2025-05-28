@@ -27,19 +27,32 @@ import {
   Code,
   useClipboard,
   Tooltip,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  Progress,
+  SimpleGrid,
 } from '@chakra-ui/react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowBackIcon, CopyIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import { supabase } from '../supabaseClient';
 import { saveMatch } from '../lib/supabase';
 import { useLiveMatch } from '../hooks/useLiveMatch';
+import { calculateImprovedEloFromMatchData } from '../lib/improvedElo';
 import type { User } from '../lib/supabase';
+import type { EloCalculationResult } from '../lib/improvedElo';
 
 const LiveScoreDisplayPage: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const { match, loading, error } = useLiveMatch(matchId);
   const [users, setUsers] = useState<User[]>([]);
   const [saving, setSaving] = useState(false);
+  const [eloPreview, setEloPreview] = useState<EloCalculationResult | null>(null);
+  const [winProbabilities, setWinProbabilities] = useState<{
+    whiteWinProb: number;
+    blueWinProb: number;
+  } | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   const navigate = useNavigate();
@@ -58,9 +71,17 @@ const LiveScoreDisplayPage: React.FC = () => {
 
   useEffect(() => {
     if (match?.status === 'finished' && !isOpen) {
+      calculateEloPreview();
       onOpen();
     }
   }, [match?.status, isOpen, onOpen]);
+
+  // Calculate live win probabilities whenever score changes
+  useEffect(() => {
+    if (match && users.length > 0) {
+      calculateSmartWinProbabilities();
+    }
+  }, [match?.white_score, match?.blue_score, users]);
 
   const loadUsers = async () => {
     try {
@@ -72,6 +93,109 @@ const LiveScoreDisplayPage: React.FC = () => {
       setUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
+    }
+  };
+
+  const calculateWinProbability = (team1Rating: number, team2Rating: number): number => {
+    return 1 / (1 + Math.pow(10, (team2Rating - team1Rating) / 400));
+  };
+
+  const calculateSmartWinProbabilities = () => {
+    if (!match || users.length === 0) return;
+
+    const whiteDefUser = users.find(u => u.id === match.white_team_defense_id);
+    const whiteOffUser = users.find(u => u.id === match.white_team_offense_id);
+    const blueDefUser = users.find(u => u.id === match.blue_team_defense_id);
+    const blueOffUser = users.find(u => u.id === match.blue_team_offense_id);
+
+    if (!whiteDefUser || !whiteOffUser || !blueDefUser || !blueOffUser) return;
+
+    // Calculate team ELO using the same weighted formula as improved ELO
+    const whiteDefElo = whiteDefUser.elo_defense || 1400;
+    const whiteOffElo = whiteOffUser.elo_offense || 1400;
+    const blueDefElo = blueDefUser.elo_defense || 1400;
+    const blueOffElo = blueOffUser.elo_offense || 1400;
+
+    const whiteWeakerElo = Math.min(whiteDefElo, whiteOffElo);
+    const whiteStrongerElo = Math.max(whiteDefElo, whiteOffElo);
+    const whiteTeamElo = whiteWeakerElo * 0.9 + whiteStrongerElo * 0.1;
+
+    const blueWeakerElo = Math.min(blueDefElo, blueOffElo);
+    const blueStrongerElo = Math.max(blueDefElo, blueOffElo);
+    const blueTeamElo = blueWeakerElo * 0.9 + blueStrongerElo * 0.1;
+
+    // 1. Base ELO probability (40% weight)
+    const baseWhiteWinProb = calculateWinProbability(whiteTeamElo, blueTeamElo);
+
+    // 2. Proximity to victory factor (35% weight)
+    const whiteProximity = match.white_score / 10; // How close white is to winning
+    const blueProximity = match.blue_score / 10;   // How close blue is to winning
+    
+    // If a team is very close to 10, they have a big advantage
+    let proximityFactor = 0.5; // neutral
+    if (whiteProximity > 0.7 || blueProximity > 0.7) {
+      // Someone is close to winning - proximity becomes very important
+      proximityFactor = whiteProximity / (whiteProximity + blueProximity);
+    } else if (match.white_score + match.blue_score > 0) {
+      // Early/mid game - proximity has moderate impact
+      proximityFactor = (whiteProximity * 0.7 + 0.5 * 0.3);
+    }
+
+    // 3. Momentum factor (25% weight) - based on recent performance
+    let momentumFactor = 0.5; // neutral
+    const totalScore = match.white_score + match.blue_score;
+    
+    if (totalScore >= 3) {
+      // Calculate momentum based on score ratio with recency bias
+      const whiteRatio = match.white_score / totalScore;
+      
+      // If the game is lopsided, momentum matters more
+      const scoreDiff = Math.abs(match.white_score - match.blue_score);
+      const lopsidedMultiplier = Math.min(1 + (scoreDiff * 0.2), 2.0);
+      
+      momentumFactor = whiteRatio * lopsidedMultiplier;
+      momentumFactor = Math.max(0.1, Math.min(0.9, momentumFactor)); // Cap between 10-90%
+    }
+
+    // 4. Combine all factors with weights
+    const combinedWhiteProb = 
+      baseWhiteWinProb * 0.40 +      // ELO base probability
+      proximityFactor * 0.35 +       // How close to winning
+      momentumFactor * 0.25;         // Current momentum
+
+    // Ensure probabilities are reasonable (5% to 95%)
+    const finalWhiteProb = Math.max(0.05, Math.min(0.95, combinedWhiteProb));
+    const finalBlueProb = 1 - finalWhiteProb;
+
+    setWinProbabilities({
+      whiteWinProb: finalWhiteProb,
+      blueWinProb: finalBlueProb
+    });
+  };
+
+  const calculateEloPreview = async () => {
+    if (!match || users.length === 0) return;
+
+    try {
+      const userMap: Record<number, User> = {};
+      users.forEach(user => {
+        userMap[user.id] = user;
+      });
+
+      const matchData = {
+        team1Defense: match.white_team_defense_id.toString(),
+        team1Offense: match.white_team_offense_id.toString(),
+        team2Defense: match.blue_team_defense_id.toString(),
+        team2Offense: match.blue_team_offense_id.toString(),
+        team1Score: match.white_score,
+        team2Score: match.blue_score,
+        date: new Date(),
+      };
+
+      const eloResult = await calculateImprovedEloFromMatchData(matchData, userMap);
+      setEloPreview(eloResult);
+    } catch (error) {
+      console.error('Error calculating ELO preview:', error);
     }
   };
 
@@ -234,6 +358,64 @@ const LiveScoreDisplayPage: React.FC = () => {
                   </VStack>
                 </VStack>
               </HStack>
+
+              {/* Live Win Probabilities - Horizontal Bar */}
+              {winProbabilities && match.status === 'active' && (
+                <VStack spacing={3} w="100%" mt={4}>
+                  <Text fontSize="md" fontWeight="bold" color="green.700" textAlign="center">
+                    🎯 Live Win Probabilities
+                  </Text>
+                  
+                  {/* Percentage Labels */}
+                  <HStack justify="space-between" w="100%" px={2}>
+                    <VStack spacing={0}>
+                      <Text fontSize="lg" fontWeight="bold" color="gray.700">
+                        {Math.round(winProbabilities.whiteWinProb * 100)}%
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">White</Text>
+                    </VStack>
+                    <VStack spacing={0}>
+                      <Text fontSize="lg" fontWeight="bold" color="blue.700">
+                        {Math.round(winProbabilities.blueWinProb * 100)}%
+                      </Text>
+                      <Text fontSize="xs" color="blue.500">Blue</Text>
+                    </VStack>
+                  </HStack>
+
+                  {/* Horizontal Progress Bar */}
+                  <Box w="100%" position="relative">
+                    <Progress 
+                      value={winProbabilities.whiteWinProb * 100} 
+                      size="lg" 
+                      colorScheme="gray"
+                      bg="blue.200"
+                      borderRadius="full"
+                      height="20px"
+                      sx={{
+                        '& > div': {
+                          background: 'linear-gradient(90deg, #718096 0%, #A0AEC0 100%)',
+                        }
+                      }}
+                    />
+                    {/* Center divider line */}
+                    <Box
+                      position="absolute"
+                      top="0"
+                      left="50%"
+                      transform="translateX(-50%)"
+                      height="20px"
+                      width="2px"
+                      bg="white"
+                      borderRadius="full"
+                      zIndex={2}
+                    />
+                  </Box>
+
+                  <Text fontSize="xs" color="gray.600" textAlign="center">
+                    Based on team ELO, proximity to victory, and game momentum
+                  </Text>
+                </VStack>
+              )}
 
               {/* Direct Team Control Buttons */}
               {match.status === 'active' && (
@@ -432,19 +614,87 @@ const LiveScoreDisplayPage: React.FC = () => {
         </Card>
       </VStack>
 
-      {/* Game Completion Modal */}
-      <Modal isOpen={isOpen} onClose={() => {}} closeOnOverlayClick={false} size="lg">
+      {/* Game Completion Modal with ELO Preview */}
+      <Modal isOpen={isOpen} onClose={() => {}} closeOnOverlayClick={false} size="xl">
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>🎉 Game Completed!</ModalHeader>
           <ModalBody>
-            <VStack spacing={4}>
-              <Text fontSize="lg" textAlign="center">
-                Final Score: {match.white_score} - {match.blue_score}
-              </Text>
-              <Text fontSize="lg" fontWeight="bold" textAlign="center" color="green.600">
-                {winner} Team Wins!
-              </Text>
+            <VStack spacing={6}>
+              <VStack spacing={2}>
+                <Text fontSize="lg" textAlign="center">
+                  Final Score: {match.white_score} - {match.blue_score}
+                </Text>
+                <Text fontSize="lg" fontWeight="bold" textAlign="center" color="green.600">
+                  {winner} Team Wins!
+                </Text>
+              </VStack>
+
+              {/* ELO Changes Preview */}
+              {eloPreview && (
+                <Card w="100%" bg="blue.50" borderColor="blue.200" borderWidth="1px">
+                  <CardBody>
+                    <VStack spacing={4}>
+                      <Heading size="md" color="blue.700" textAlign="center">
+                        📊 ELO Rating Changes Preview
+                      </Heading>
+                      
+                      <SimpleGrid columns={2} spacing={4} w="100%">
+                        {/* White Team Changes */}
+                        <VStack spacing={3} p={3} bg="white" borderRadius="md" borderWidth="1px">
+                          <Text fontWeight="bold" color="gray.700">White Team</Text>
+                          <VStack spacing={2}>
+                            <HStack justify="space-between" w="100%">
+                              <Text fontSize="sm">{getUserName(match.white_team_defense_id)} (D):</Text>
+                              <Badge 
+                                colorScheme={eloPreview.team1DefenseChange >= 0 ? 'green' : 'red'}
+                                fontSize="sm"
+                              >
+                                {eloPreview.team1DefenseChange >= 0 ? '+' : ''}{eloPreview.team1DefenseChange}
+                              </Badge>
+                            </HStack>
+                            <HStack justify="space-between" w="100%">
+                              <Text fontSize="sm">{getUserName(match.white_team_offense_id)} (O):</Text>
+                              <Badge 
+                                colorScheme={eloPreview.team1OffenseChange >= 0 ? 'green' : 'red'}
+                                fontSize="sm"
+                              >
+                                {eloPreview.team1OffenseChange >= 0 ? '+' : ''}{eloPreview.team1OffenseChange}
+                              </Badge>
+                            </HStack>
+                          </VStack>
+                        </VStack>
+
+                        {/* Blue Team Changes */}
+                        <VStack spacing={3} p={3} bg="blue.50" borderRadius="md" borderWidth="1px">
+                          <Text fontWeight="bold" color="blue.700">Blue Team</Text>
+                          <VStack spacing={2}>
+                            <HStack justify="space-between" w="100%">
+                              <Text fontSize="sm">{getUserName(match.blue_team_defense_id)} (D):</Text>
+                              <Badge 
+                                colorScheme={eloPreview.team2DefenseChange >= 0 ? 'green' : 'red'}
+                                fontSize="sm"
+                              >
+                                {eloPreview.team2DefenseChange >= 0 ? '+' : ''}{eloPreview.team2DefenseChange}
+                              </Badge>
+                            </HStack>
+                            <HStack justify="space-between" w="100%">
+                              <Text fontSize="sm">{getUserName(match.blue_team_offense_id)} (O):</Text>
+                              <Badge 
+                                colorScheme={eloPreview.team2OffenseChange >= 0 ? 'green' : 'red'}
+                                fontSize="sm"
+                              >
+                                {eloPreview.team2OffenseChange >= 0 ? '+' : ''}{eloPreview.team2OffenseChange}
+                              </Badge>
+                            </HStack>
+                          </VStack>
+                        </VStack>
+                      </SimpleGrid>
+                    </VStack>
+                  </CardBody>
+                </Card>
+              )}
+
               <Text textAlign="center" color="gray.600">
                 Would you like to save this match to the database and update ELO ratings?
               </Text>
