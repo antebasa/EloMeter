@@ -206,6 +206,41 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
     return player ? player.name : "";
   };
 
+  const getPlayerElo = (id: string, position: 'defense' | 'offense'): number => {
+    if (!id) return 1400;
+    const player = users.find(user => user.id.toString() === id);
+    if (!player) return 1400;
+    return position === 'defense' ? (player.elo_defense || 1400) : (player.elo_offense || 1400);
+  };
+
+  const calculateTeamElos = () => {
+    if (!formData.team1Defense || !formData.team1Offense || !formData.team2Defense || !formData.team2Offense) {
+      return { team1Elo: 0, team2Elo: 0, eloDifference: 0 };
+    }
+
+    // Team 1 ELO calculation: 0.3 * stronger + 0.7 * weaker
+    const t1DefElo = getPlayerElo(formData.team1Defense, 'defense');
+    const t1OffElo = getPlayerElo(formData.team1Offense, 'offense');
+    const team1WeakerElo = Math.min(t1DefElo, t1OffElo);
+    const team1StrongerElo = Math.max(t1DefElo, t1OffElo);
+    const team1Elo = team1StrongerElo * 0.3 + team1WeakerElo * 0.7;
+
+    // Team 2 ELO calculation: 0.3 * stronger + 0.7 * weaker
+    const t2DefElo = getPlayerElo(formData.team2Defense, 'defense');
+    const t2OffElo = getPlayerElo(formData.team2Offense, 'offense');
+    const team2WeakerElo = Math.min(t2DefElo, t2OffElo);
+    const team2StrongerElo = Math.max(t2DefElo, t2OffElo);
+    const team2Elo = team2StrongerElo * 0.3 + team2WeakerElo * 0.7;
+
+    const eloDifference = Math.abs(team1Elo - team2Elo);
+
+    return { 
+      team1Elo: Math.round(team1Elo), 
+      team2Elo: Math.round(team2Elo), 
+      eloDifference: Math.round(eloDifference) 
+    };
+  };
+
   const handleModalClose = () => {
     setEloChanges(null);
     onClose();
@@ -364,9 +399,9 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
       </Box>
 
       {/* Confirmation Modal */}
-      <Modal isOpen={isOpen} onClose={handleModalClose}>
+      <Modal isOpen={isOpen} onClose={handleModalClose} size="xl">
         <ModalOverlay />
-        <ModalContent>
+        <ModalContent maxW="800px">
           <ModalHeader>Confirm Match Result</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
@@ -374,18 +409,76 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
 
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
               <Box>
-                <Text fontWeight="semibold">Team 1</Text>
+                <Text fontWeight="semibold">Team 1 (White)</Text>
                 <Text>Defense: {getPlayerName(formData.team1Defense)}</Text>
                 <Text>Offense: {getPlayerName(formData.team1Offense)}</Text>
                 <Text fontWeight="bold" mt={2}>Score: {formData.team1Score}</Text>
               </Box>
               <Box>
-                <Text fontWeight="semibold">Team 2</Text>
+                <Text fontWeight="semibold">Team 2 (Blue)</Text>
                 <Text>Defense: {getPlayerName(formData.team2Defense)}</Text>
                 <Text>Offense: {getPlayerName(formData.team2Offense)}</Text>
                 <Text fontWeight="bold" mt={2}>Score: {formData.team2Score}</Text>
               </Box>
             </SimpleGrid>
+
+            {/* Team ELO Information */}
+            {formData.team1Defense && formData.team1Offense && formData.team2Defense && formData.team2Offense && (
+              <>
+                <Divider my={4} />
+                <VStack spacing={3} align="stretch">
+                  <Text fontWeight="bold" textAlign="center" color="purple.600">
+                    Team ELO Ratings
+                  </Text>
+                  
+                  <HStack justify="space-between" align="center">
+                    <VStack spacing={1} align="start" flex={1}>
+                      <Text fontSize="md" fontWeight="semibold">Team 1 (White)</Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {getPlayerName(formData.team1Defense)} (D): {getPlayerElo(formData.team1Defense, 'defense')}
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {getPlayerName(formData.team1Offense)} (O): {getPlayerElo(formData.team1Offense, 'offense')}
+                      </Text>
+                      <Text fontSize="lg" fontWeight="bold" color="purple.600">
+                        Team ELO: {calculateTeamElos().team1Elo}
+                      </Text>
+                    </VStack>
+
+                    <VStack spacing={2} align="center">
+                      <Text fontSize="sm" color="gray.500">ELO Difference</Text>
+                      <Badge 
+                        colorScheme={calculateTeamElos().eloDifference > 75 ? "orange" : "green"}
+                        variant="solid"
+                        fontSize="lg"
+                        px={3}
+                        py={1}
+                      >
+                        {calculateTeamElos().eloDifference}
+                      </Badge>
+                      {calculateTeamElos().eloDifference > 75 && (
+                        <Text fontSize="xs" color="orange.600" textAlign="center">
+                          Protection active
+                        </Text>
+                      )}
+                    </VStack>
+
+                    <VStack spacing={1} align="end" flex={1}>
+                      <Text fontSize="md" fontWeight="semibold">Team 2 (Blue)</Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {getPlayerName(formData.team2Defense)} (D): {getPlayerElo(formData.team2Defense, 'defense')}
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {getPlayerName(formData.team2Offense)} (O): {getPlayerElo(formData.team2Offense, 'offense')}
+                      </Text>
+                      <Text fontSize="lg" fontWeight="bold" color="purple.600">
+                        Team ELO: {calculateTeamElos().team2Elo}
+                      </Text>
+                    </VStack>
+                  </HStack>
+                </VStack>
+              </>
+            )}
 
             {/* ELO Changes Display */}
             {eloChanges && (
@@ -419,7 +512,7 @@ export const EnterScore = ({ onSubmit }: EnterScoreProps) => {
                       </HStack>
                     </VStack>
 
-                    <VStack spacing={1} align="start" flex={1}>
+                    <VStack spacing={1} align="end" flex={1}>
                       <Text fontSize="sm" fontWeight="semibold">Team 2 Players</Text>
                       <HStack>
                         <Text fontSize="sm">{getPlayerName(formData.team2Defense)} (D):</Text>
