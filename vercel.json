@@ -1,9 +1,12 @@
 {
   "framework": "vite",
-  "buildCommand": "yarn build",
+  "buildCommand": "yarn build:vercel",
   "outputDirectory": "dist",
   "installCommand": "yarn install",
   "devCommand": "yarn dev",
+  "env": {
+    "CI": "false"
+  },
   "rewrites": [
     {
       "source": "/(.*)",
