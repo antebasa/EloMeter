@@ -42,17 +42,16 @@ export function calculateImprovedElo(
   team2Offense: User,
   team1Score: number,
   team2Score: number,
-  parameters: EloParameters = DEFAULT_ELO_PARAMETERS
 ): EloCalculationResult {
   const explanation: string[] = [];
 
   // Check if any player is a beginner
-  const hasBeginners = team1Defense.beginner || team1Offense.beginner || 
+  const hasBeginners = team1Defense.beginner || team1Offense.beginner ||
                       team2Defense.beginner || team2Offense.beginner;
 
   if (hasBeginners) {
     explanation.push(`🔰 Beginner match detected! Using simplified scoring: +1 for winners, -1 for losers`);
-    
+
     // Simple beginner scoring: winners get +1, losers get -1, draws get 0
     let team1DefenseChange = 0;
     let team1OffenseChange = 0;
@@ -114,7 +113,7 @@ export function calculateImprovedElo(
 
   // Calculate score difference
   const scoreDiff = Math.abs(team1Score - team2Score);
-  
+
   // Determine base ELO change based on score difference
   let baseEloChange = 0;
   if (scoreDiff === 1) baseEloChange = 5;
@@ -133,13 +132,13 @@ export function calculateImprovedElo(
   // Check for ELO difference protection
   const teamEloGap = Math.abs(team1Avg - team2Avg);
   let eloChangeMultiplier = 1;
-  
+
   if (teamEloGap > 75) {
     // Check if weaker team lost
     const team1IsWeaker = team1Avg < team2Avg;
-    const weakerTeamLost = (team1IsWeaker && team1Score < team2Score) || 
+    const weakerTeamLost = (team1IsWeaker && team1Score < team2Score) ||
                            (!team1IsWeaker && team2Score < team1Score);
-    
+
     if (weakerTeamLost) {
       eloChangeMultiplier = 0.5;
       explanation.push(`🛡️ ELO protection applied: Team gap ${Math.round(teamEloGap)} > 75 and weaker team lost → ELO change halved`);
@@ -148,7 +147,7 @@ export function calculateImprovedElo(
 
   // Calculate final ELO changes
   const finalEloChange = Math.round(baseEloChange * eloChangeMultiplier);
-  
+
   let team1DefenseChange = 0;
   let team1OffenseChange = 0;
   let team2DefenseChange = 0;
