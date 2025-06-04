@@ -42,7 +42,7 @@ export function calculateImprovedElo(
   team2Offense: User,
   team1Score: number,
   team2Score: number,
-  parameters: EloParameters = DEFAULT_ELO_PARAMETERS
+  _parameters: EloParameters = DEFAULT_ELO_PARAMETERS
 ): EloCalculationResult {
   const explanation: string[] = [];
 
