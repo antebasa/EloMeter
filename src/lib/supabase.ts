@@ -27,6 +27,7 @@ export interface User {
   played?: number;
   elo_offense?: number;
   elo_defense?: number;
+  beginner?: boolean;
 }
 
 // export enum TeamColor { // No longer used directly in Team table for match context
@@ -169,7 +170,7 @@ export async function saveMatch(matchData: MatchData): Promise<{ success: boolea
 
     const { data: usersData, error: getUsersError } = await supabase
       .from('User')
-      .select('id, name, elo_offense, elo_defense, scored, conceded, wins, losses, played')
+      .select('id, name, elo_offense, elo_defense, scored, conceded, wins, losses, played, beginner')
       .in('id', playerIds);
 
     if (getUsersError || !usersData || usersData.length < playerIds.length) {

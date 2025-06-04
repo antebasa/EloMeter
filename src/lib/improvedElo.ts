@@ -47,6 +47,54 @@ export function calculateImprovedElo(
 ): EloCalculationResult {
   const explanation: string[] = [];
 
+  // Check if any player is a beginner
+  const hasBeginners = team1Defense.beginner || team1Offense.beginner || 
+                      team2Defense.beginner || team2Offense.beginner;
+
+  if (hasBeginners) {
+    explanation.push(`🔰 Beginner match detected! Using simplified scoring: +1 for winners, -1 for losers`);
+    
+    // Simple beginner scoring: winners get +1, losers get -1, draws get 0
+    let team1DefenseChange = 0;
+    let team1OffenseChange = 0;
+    let team2DefenseChange = 0;
+    let team2OffenseChange = 0;
+
+    if (team1Score > team2Score) {
+      // Team 1 wins
+      team1DefenseChange = 1;
+      team1OffenseChange = 1;
+      team2DefenseChange = -1;
+      team2OffenseChange = -1;
+      explanation.push(`Team 1 wins: Team 1 gets +1, Team 2 gets -1`);
+    } else if (team2Score > team1Score) {
+      // Team 2 wins
+      team1DefenseChange = -1;
+      team1OffenseChange = -1;
+      team2DefenseChange = 1;
+      team2OffenseChange = 1;
+      explanation.push(`Team 2 wins: Team 2 gets +1, Team 1 gets -1`);
+    } else {
+      // Draw
+      explanation.push(`Draw: No ELO changes for any player`);
+    }
+
+    explanation.push(`Final ELO changes:`);
+    explanation.push(`${team1Defense.name} (Defense): ${team1DefenseChange > 0 ? '+' : ''}${team1DefenseChange}`);
+    explanation.push(`${team1Offense.name} (Offense): ${team1OffenseChange > 0 ? '+' : ''}${team1OffenseChange}`);
+    explanation.push(`${team2Defense.name} (Defense): ${team2DefenseChange > 0 ? '+' : ''}${team2DefenseChange}`);
+    explanation.push(`${team2Offense.name} (Offense): ${team2OffenseChange > 0 ? '+' : ''}${team2OffenseChange}`);
+
+    return {
+      team1DefenseChange,
+      team1OffenseChange,
+      team2DefenseChange,
+      team2OffenseChange,
+      explanation
+    };
+  }
+
+  // Original complex algorithm for non-beginner matches
   // Get current ELO ratings
   const t1DefElo = team1Defense.elo_defense || 1400;
   const t1OffElo = team1Offense.elo_offense || 1400;
@@ -214,7 +262,7 @@ export function calculateImprovedElo(
   }
 
   // RULE: Winners never lose points - ensure minimum gain for winning team
-  const minWinnerGain = 2; // Minimum points for winning
+  const minWinnerGain = 2;
 
   if (team1Score > team2Score) {
     // Team 1 won
