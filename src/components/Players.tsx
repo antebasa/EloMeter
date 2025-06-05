@@ -15,6 +15,12 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
   Popover,
   PopoverArrow,
   PopoverBody,
@@ -36,12 +42,13 @@ import {
   Th,
   Thead,
   Tr,
-  useColorModeValue
+  useColorModeValue,
+  VStack
 } from "@chakra-ui/react";
 import {SearchIcon} from '@chakra-ui/icons';
 import {GiCrossedSwords, GiShield} from 'react-icons/gi';
 import type {User as SupabaseUser, PlayerMatchStatsQueryResultEntry, TeamWithStats} from "../lib/supabase";
-import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats, getTeamRankings} from "../lib/supabase";
+import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats, getTeamRankings, getTeamMatchHistory} from "../lib/supabase";
 
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
@@ -129,6 +136,10 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     direction: 'ascending' | 'descending';
   }>({ key: 'winPercentage', direction: 'descending' });
   const [activeTab, setActiveTab] = useState(0); // 0 for offense, 1 for defense, 2 for overall, 3 for teams
+  const [selectedTeam, setSelectedTeam] = useState<TeamWithStats | null>(null);
+  const [teamMatchHistory, setTeamMatchHistory] = useState<any[]>([]);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [loadingTeamHistory, setLoadingTeamHistory] = useState(false);
 
   useEffect(() => {
     async function loadUsers() {
@@ -507,6 +518,28 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     );
   };
 
+  const handleTeamClick = async (team: TeamWithStats) => {
+    setSelectedTeam(team);
+    setIsTeamModalOpen(true);
+    setLoadingTeamHistory(true);
+    
+    try {
+      const history = await getTeamMatchHistory(team.id);
+      setTeamMatchHistory(history);
+    } catch (error) {
+      console.error('Error loading team match history:', error);
+      setTeamMatchHistory([]);
+    } finally {
+      setLoadingTeamHistory(false);
+    }
+  };
+
+  const closeTeamModal = () => {
+    setIsTeamModalOpen(false);
+    setSelectedTeam(null);
+    setTeamMatchHistory([]);
+  };
+
   if (loading) {
     return (
       <Box textAlign="center" py={10}>
@@ -731,6 +764,8 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                       key={team.id}
                       _hover={{ bg: rowHoverBg }}
                       transition="background-color 0.2s ease-in-out"
+                      cursor="pointer"
+                      onClick={() => handleTeamClick(team)}
                       backgroundColor={positionColor(idx)}
                     >
                       <Td>
@@ -783,6 +818,123 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
           No {activeTab === 3 ? 'teams' : 'players'} available. Add some {activeTab === 3 ? 'teams and' : 'players and'} matches to get started!
          </Text>
       ) as ReactNode}
+      
+      {/* Team Match History Modal */}
+      <Modal isOpen={isTeamModalOpen} onClose={closeTeamModal} size="6xl">
+        <ModalOverlay />
+        <ModalContent maxH="90vh">
+          <ModalHeader>
+            {selectedTeam && (
+              <VStack spacing={2} align="start">
+                <Text fontSize="xl">Team Match History</Text>
+                <HStack spacing={4}>
+                  <HStack spacing={2}>
+                    <Icon as={GiShield} boxSize={4} color="blue.600" />
+                    <Avatar 
+                      size="xs" 
+                      name={selectedTeam.defender_name} 
+                      src={selectedTeam.defender_avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${selectedTeam.defender_avatar_url}` : undefined} 
+                    />
+                    <Text fontSize="sm" fontWeight="medium" color="blue.700">
+                      {selectedTeam.defender_name}
+                    </Text>
+                  </HStack>
+                  <Text fontSize="sm" color="gray.500">&</Text>
+                  <HStack spacing={2}>
+                    <Icon as={GiCrossedSwords} boxSize={4} color="orange.600" />
+                    <Avatar 
+                      size="xs" 
+                      name={selectedTeam.attacker_name} 
+                      src={selectedTeam.attacker_avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${selectedTeam.attacker_avatar_url}` : undefined} 
+                    />
+                    <Text fontSize="sm" fontWeight="medium" color="orange.700">
+                      {selectedTeam.attacker_name}
+                    </Text>
+                  </HStack>
+                </HStack>
+                <Text fontSize="sm" color="gray.600">
+                  {selectedTeam.played} matches played • {selectedTeam.won} wins • {selectedTeam.winPercentage}% win rate
+                </Text>
+              </VStack>
+            )}
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody overflowY="auto">
+            {loadingTeamHistory ? (
+              <Box textAlign="center" py={10}>
+                <Spinner size="xl" color="teal.500" />
+                <Text mt={4} color={textColor}>Loading team match history...</Text>
+              </Box>
+            ) : teamMatchHistory.length === 0 ? (
+              <Box textAlign="center" py={10}>
+                <Text color={textColor}>No match history available for this team.</Text>
+              </Box>
+            ) : (
+              <Box
+                display="grid"
+                gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }}
+                gap={4}
+                pb={4}
+              >
+                {teamMatchHistory.map((match, index) => {
+                  const isWin = match.result === "Win";
+                  const isDraw = match.result === "Draw";
+                  
+                  return (
+                    <Box
+                      key={index}
+                      p={4}
+                      borderRadius="md"
+                      bg={isWin ? "green.50" : isDraw ? "gray.50" : "red.50"}
+                      border="2px solid"
+                      borderColor={isWin ? "green.200" : isDraw ? "gray.200" : "red.200"}
+                      _hover={{
+                        borderColor: isWin ? "green.400" : isDraw ? "gray.400" : "red.400",
+                        transform: "translateY(-1px)"
+                      }}
+                      transition="all 0.2s ease"
+                    >
+                      <VStack spacing={3}>
+                        {/* Date */}
+                        <Text fontSize="xs" color="gray.500">
+                          {new Date(match.date).toLocaleDateString()}
+                        </Text>
+                        
+                        {/* Score */}
+                        <Text fontSize="xl" fontWeight="bold" color="gray.800">
+                          {match.score}
+                        </Text>
+                        
+                        {/* Result */}
+                        <Badge 
+                          colorScheme={isWin ? "green" : isDraw ? "gray" : "red"}
+                          variant="solid"
+                          fontSize="sm"
+                        >
+                          {match.result}
+                        </Badge>
+                        
+                        {/* Team Color */}
+                        <Text fontSize="sm" color="gray.600">
+                          Played as {match.teamColor} team
+                        </Text>
+                        
+                        {/* VS */}
+                        <Text fontSize="xs" color="gray.500" fontWeight="bold">VS</Text>
+                        
+                        {/* Opponent */}
+                        <Text fontSize="sm" fontWeight="medium" color="red.700" textAlign="center">
+                          {match.opponent}
+                        </Text>
+                      </VStack>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

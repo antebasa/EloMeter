@@ -1023,3 +1023,114 @@ export async function getTeamRankings(): Promise<TeamWithStats[]> {
     return [];
   }
 }
+
+// Function to get team match history
+export async function getTeamMatchHistory(teamId: number): Promise<any[]> {
+  try {
+    // Get all matches where this team played
+    const { data: matches, error: matchesError } = await supabase
+      .from('Match')
+      .select(`
+        id,
+        created_at,
+        white_team_id,
+        blue_team_id,
+        team_white_score,
+        team_blue_score
+      `)
+      .or(`white_team_id.eq.${teamId},blue_team_id.eq.${teamId}`)
+      .order('created_at', { ascending: false });
+
+    if (matchesError || !matches) {
+      console.error('Error fetching team matches:', matchesError);
+      return [];
+    }
+
+    if (matches.length === 0) {
+      return [];
+    }
+
+    // Get all unique team IDs for opponent information
+    const allTeamIds = new Set<number>();
+    matches.forEach(match => {
+      allTeamIds.add(match.white_team_id);
+      allTeamIds.add(match.blue_team_id);
+    });
+
+    // Get team details for all teams
+    const { data: teams, error: teamsError } = await supabase
+      .from('Team')
+      .select('id, name, player_defense_id, player_offense_id')
+      .in('id', Array.from(allTeamIds));
+
+    if (teamsError || !teams) {
+      console.error('Error fetching team details:', teamsError);
+      return [];
+    }
+
+    // Get all unique user IDs for player names
+    const allUserIds = new Set<number>();
+    teams.forEach(team => {
+      allUserIds.add(team.player_defense_id);
+      allUserIds.add(team.player_offense_id);
+    });
+
+    // Get user names
+    const { data: users, error: usersError } = await supabase
+      .from('User')
+      .select('id, name')
+      .in('id', Array.from(allUserIds));
+
+    if (usersError || !users) {
+      console.error('Error fetching user names:', usersError);
+      return [];
+    }
+
+    // Create maps for quick lookup
+    const teamMap = teams.reduce((acc, team) => {
+      acc[team.id] = team;
+      return acc;
+    }, {} as Record<number, any>);
+
+    const userMap = users.reduce((acc, user) => {
+      acc[user.id] = user.name;
+      return acc;
+    }, {} as Record<number, string>);
+
+    // Process match history
+    return matches.map(match => {
+      const isWhiteTeam = match.white_team_id === teamId;
+      const teamScore = isWhiteTeam ? match.team_white_score : match.team_blue_score;
+      const opponentScore = isWhiteTeam ? match.team_blue_score : match.team_white_score;
+      const opponentTeamId = isWhiteTeam ? match.blue_team_id : match.white_team_id;
+
+      // Determine result
+      let result = 'Draw';
+      if (teamScore > opponentScore) result = 'Win';
+      else if (teamScore < opponentScore) result = 'Loss';
+
+      // Get opponent team information
+      const opponentTeam = teamMap[opponentTeamId];
+      let opponentName = 'Unknown Team';
+      if (opponentTeam) {
+        const defenderName = userMap[opponentTeam.player_defense_id] || 'Unknown';
+        const attackerName = userMap[opponentTeam.player_offense_id] || 'Unknown';
+        opponentName = opponentTeam.name || `${defenderName} (D) & ${attackerName} (O)`;
+      }
+
+      return {
+        id: match.id,
+        date: match.created_at,
+        result,
+        score: `${teamScore}-${opponentScore}`,
+        teamScore,
+        opponentScore,
+        opponent: opponentName,
+        teamColor: isWhiteTeam ? 'White' : 'Blue'
+      };
+    });
+  } catch (error) {
+    console.error('Error in getTeamMatchHistory:', error);
+    return [];
+  }
+}
