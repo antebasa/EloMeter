@@ -9,6 +9,7 @@ import {
   Badge,
   Box,
   Flex,
+  Grid,
   Heading,
   HStack,
   Icon,
@@ -47,8 +48,9 @@ import {
 } from "@chakra-ui/react";
 import {SearchIcon} from '@chakra-ui/icons';
 import {GiCrossedSwords, GiShield} from 'react-icons/gi';
+import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, BarChart, Bar, PieChart, Pie, Cell} from 'recharts';
 import type {User as SupabaseUser, PlayerMatchStatsQueryResultEntry, TeamWithStats} from "../lib/supabase";
-import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats, getTeamRankings, getTeamMatchHistory} from "../lib/supabase";
+import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats, getTeamRankings, getTeamMatchHistory, getTeamPerformanceAnalytics} from "../lib/supabase";
 
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
@@ -138,6 +140,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
   const [activeTab, setActiveTab] = useState(0); // 0 for offense, 1 for defense, 2 for overall, 3 for teams
   const [selectedTeam, setSelectedTeam] = useState<TeamWithStats | null>(null);
   const [teamMatchHistory, setTeamMatchHistory] = useState<any[]>([]);
+  const [teamAnalytics, setTeamAnalytics] = useState<any>(null);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [loadingTeamHistory, setLoadingTeamHistory] = useState(false);
 
@@ -524,11 +527,16 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     setLoadingTeamHistory(true);
     
     try {
-      const history = await getTeamMatchHistory(team.id);
+      const [history, analytics] = await Promise.all([
+        getTeamMatchHistory(team.id),
+        getTeamPerformanceAnalytics(team.id)
+      ]);
       setTeamMatchHistory(history);
+      setTeamAnalytics(analytics);
     } catch (error) {
-      console.error('Error loading team match history:', error);
+      console.error('Error loading team data:', error);
       setTeamMatchHistory([]);
+      setTeamAnalytics(null);
     } finally {
       setLoadingTeamHistory(false);
     }
@@ -538,6 +546,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     setIsTeamModalOpen(false);
     setSelectedTeam(null);
     setTeamMatchHistory([]);
+    setTeamAnalytics(null);
   };
 
   if (loading) {
@@ -826,7 +835,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
           <ModalHeader>
             {selectedTeam && (
               <VStack spacing={2} align="start">
-                <Text fontSize="xl">Team Match History</Text>
+                <Text fontSize="xl">Team Performance Dashboard</Text>
                 <HStack spacing={4}>
                   <HStack spacing={2}>
                     <Icon as={GiShield} boxSize={4} color="blue.600" />
@@ -852,9 +861,6 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                     </Text>
                   </HStack>
                 </HStack>
-                <Text fontSize="sm" color="gray.600">
-                  {selectedTeam.played} matches played • {selectedTeam.won} wins • {selectedTeam.winPercentage}% win rate
-                </Text>
               </VStack>
             )}
           </ModalHeader>
@@ -863,73 +869,303 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
             {loadingTeamHistory ? (
               <Box textAlign="center" py={10}>
                 <Spinner size="xl" color="teal.500" />
-                <Text mt={4} color={textColor}>Loading team match history...</Text>
+                <Text mt={4} color={textColor}>Loading team data...</Text>
               </Box>
-            ) : teamMatchHistory.length === 0 ? (
-              <Box textAlign="center" py={10}>
-                <Text color={textColor}>No match history available for this team.</Text>
-              </Box>
+            ) : teamAnalytics ? (
+              <Tabs variant="soft-rounded" colorScheme="teal">
+                <TabList mb={4} justifyContent="center">
+                  <Tab>Overview</Tab>
+                  <Tab>Performance Charts</Tab>
+                  <Tab>Match History</Tab>
+                </TabList>
+
+                <TabPanels>
+                  {/* Overview Tab */}
+                  <TabPanel p={0}>
+                    <VStack spacing={6}>
+                      {/* Key Statistics */}
+                      <Box
+                        p={4}
+                        bg="blue.50"
+                        borderRadius="md"
+                        border="2px solid"
+                        borderColor="blue.200"
+                        w="100%"
+                      >
+                        <Heading as="h3" size="md" mb={4} textAlign="center" color="blue.700">
+                          Team Statistics
+                        </Heading>
+                        <Grid templateColumns={{ base: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }} gap={4}>
+                          <Box textAlign="center">
+                            <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+                              {teamAnalytics.totalMatches}
+                            </Text>
+                            <Text fontSize="sm" color="gray.600">Matches Played</Text>
+                          </Box>
+                          <Box textAlign="center">
+                            <Text fontSize="2xl" fontWeight="bold" color="green.600">
+                              {teamAnalytics.wins}
+                            </Text>
+                            <Text fontSize="sm" color="gray.600">Wins</Text>
+                          </Box>
+                          <Box textAlign="center">
+                            <Text fontSize="2xl" fontWeight="bold" color="orange.600">
+                              {teamAnalytics.winPercentage}%
+                            </Text>
+                            <Text fontSize="sm" color="gray.600">Win Rate</Text>
+                          </Box>
+                          <Box textAlign="center">
+                            <Text fontSize="2xl" fontWeight="bold" color={teamAnalytics.goalDifference >= 0 ? "green.600" : "red.600"}>
+                              {teamAnalytics.goalDifference >= 0 ? '+' : ''}{teamAnalytics.goalDifference}
+                            </Text>
+                            <Text fontSize="sm" color="gray.600">Goal Difference</Text>
+                          </Box>
+                        </Grid>
+                      </Box>
+
+                      {/* Goal Statistics */}
+                      <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }} gap={6} w="100%">
+                        <Box p={4} bg="green.50" borderRadius="md" border="1px solid" borderColor="green.200">
+                          <Heading as="h4" size="sm" mb={3} color="green.700">Offensive Stats</Heading>
+                          <VStack spacing={2} align="stretch">
+                            <Flex justify="space-between">
+                              <Text fontSize="sm">Goals Scored:</Text>
+                              <Text fontWeight="bold" color="green.600">{teamAnalytics.goalsFor}</Text>
+                            </Flex>
+                            <Flex justify="space-between">
+                              <Text fontSize="sm">Average per Match:</Text>
+                              <Text fontWeight="bold" color="green.600">{teamAnalytics.averageGoalsFor}</Text>
+                            </Flex>
+                          </VStack>
+                        </Box>
+
+                        <Box p={4} bg="red.50" borderRadius="md" border="1px solid" borderColor="red.200">
+                          <Heading as="h4" size="sm" mb={3} color="red.700">Defensive Stats</Heading>
+                          <VStack spacing={2} align="stretch">
+                            <Flex justify="space-between">
+                              <Text fontSize="sm">Goals Conceded:</Text>
+                              <Text fontWeight="bold" color="red.600">{teamAnalytics.goalsAgainst}</Text>
+                            </Flex>
+                            <Flex justify="space-between">
+                              <Text fontSize="sm">Average per Match:</Text>
+                              <Text fontWeight="bold" color="red.600">{teamAnalytics.averageGoalsAgainst}</Text>
+                            </Flex>
+                          </VStack>
+                        </Box>
+                      </Grid>
+
+                      {/* Team Color Performance */}
+                      <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }} gap={6} w="100%">
+                        <Box p={4} bg="gray.50" borderRadius="md" border="1px solid" borderColor="gray.200">
+                          <Heading as="h4" size="sm" mb={3} color="gray.700">White Team Performance</Heading>
+                          <Text fontSize="sm" color="gray.600">
+                            {teamAnalytics.whiteTeamRecord.wins}W - {teamAnalytics.whiteTeamRecord.losses}L - {teamAnalytics.whiteTeamRecord.draws}D
+                            <Text as="span" fontWeight="bold" ml={2}>
+                              ({teamAnalytics.whiteTeamRecord.total > 0 ? Math.round((teamAnalytics.whiteTeamRecord.wins / teamAnalytics.whiteTeamRecord.total) * 100) : 0}%)
+                            </Text>
+                          </Text>
+                        </Box>
+
+                        <Box p={4} bg="blue.50" borderRadius="md" border="1px solid" borderColor="blue.200">
+                          <Heading as="h4" size="sm" mb={3} color="blue.700">Blue Team Performance</Heading>
+                          <Text fontSize="sm" color="gray.600">
+                            {teamAnalytics.blueTeamRecord.wins}W - {teamAnalytics.blueTeamRecord.losses}L - {teamAnalytics.blueTeamRecord.draws}D
+                            <Text as="span" fontWeight="bold" ml={2}>
+                              ({teamAnalytics.blueTeamRecord.total > 0 ? Math.round((teamAnalytics.blueTeamRecord.wins / teamAnalytics.blueTeamRecord.total) * 100) : 0}%)
+                            </Text>
+                          </Text>
+                        </Box>
+                      </Grid>
+
+                      {/* Recent Form */}
+                      <Box p={4} bg="gray.50" borderRadius="md" border="1px solid" borderColor="gray.200" w="100%">
+                        <Heading as="h4" size="sm" mb={3} color="gray.700">Recent Form (Last 10 Matches)</Heading>
+                        <HStack spacing={1} justify="center">
+                          {teamAnalytics.recentForm.map((result: string, index: number) => (
+                            <Badge
+                              key={index}
+                              colorScheme={result === 'Win' ? 'green' : result === 'Draw' ? 'yellow' : 'red'}
+                              variant="solid"
+                              fontSize="xs"
+                            >
+                              {result.charAt(0)}
+                            </Badge>
+                          ))}
+                        </HStack>
+                      </Box>
+                    </VStack>
+                  </TabPanel>
+
+                  {/* Performance Charts Tab */}
+                  <TabPanel p={0}>
+                    <VStack spacing={6}>
+                      {/* Win Percentage Over Time */}
+                      {teamAnalytics.performanceOverTime.length > 1 && (
+                        <Box w="100%">
+                          <Heading as="h4" size="md" mb={4} textAlign="center">Win Percentage Over Time</Heading>
+                          <Box height="300px" bg="whiteAlpha.100" borderRadius="md" p={2}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={teamAnalytics.performanceOverTime}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="matchNumber" />
+                                <YAxis domain={[0, 100]} />
+                                <Tooltip
+                                  formatter={(value: any) => [`${value}%`, 'Win Percentage']}
+                                  labelFormatter={(label) => `Match ${label}`}
+                                />
+                                <Line
+                                  type="monotone"
+                                  dataKey="winPercentage"
+                                  stroke="#3182CE"
+                                  strokeWidth={3}
+                                  dot={{ r: 4 }}
+                                  activeDot={{ r: 6 }}
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Goals Scored vs Conceded */}
+                      {teamAnalytics.performanceOverTime.length > 1 && (
+                        <Box w="100%">
+                          <Heading as="h4" size="md" mb={4} textAlign="center">Goals Per Match</Heading>
+                          <Box height="300px" bg="whiteAlpha.100" borderRadius="md" p={2}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={teamAnalytics.performanceOverTime}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="matchNumber" />
+                                <YAxis />
+                                <Tooltip
+                                  labelFormatter={(label) => `Match ${label}`}
+                                />
+                                <Legend />
+                                <Bar dataKey="goalsFor" fill="#38A169" name="Goals For" />
+                                <Bar dataKey="goalsAgainst" fill="#E53E3E" name="Goals Against" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Results Distribution Pie Chart */}
+                      <Box w="100%">
+                        <Heading as="h4" size="md" mb={4} textAlign="center">Results Distribution</Heading>
+                        <Box height="300px" bg="whiteAlpha.100" borderRadius="md" p={2}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={[
+                                  { name: 'Wins', value: teamAnalytics.wins, color: '#38A169' },
+                                  { name: 'Losses', value: teamAnalytics.losses, color: '#E53E3E' },
+                                  { name: 'Draws', value: teamAnalytics.draws, color: '#D69E2E' }
+                                ]}
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                dataKey="value"
+                                label={({ name, value }) => `${name}: ${value}`}
+                              >
+                                {[
+                                  { name: 'Wins', value: teamAnalytics.wins, color: '#38A169' },
+                                  { name: 'Losses', value: teamAnalytics.losses, color: '#E53E3E' },
+                                  { name: 'Draws', value: teamAnalytics.draws, color: '#D69E2E' }
+                                ].map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </Box>
+                      </Box>
+                    </VStack>
+                  </TabPanel>
+
+                  {/* Match History Tab */}
+                  <TabPanel p={0}>
+                    {teamMatchHistory.length === 0 ? (
+                      <Box textAlign="center" py={10}>
+                        <Text color={textColor}>No match history available for this team.</Text>
+                      </Box>
+                    ) : (
+                      <Box
+                        display="grid"
+                        gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }}
+                        gap={4}
+                        pb={4}
+                      >
+                        {teamMatchHistory.map((match, index) => {
+                          const isWin = match.result === "Win";
+                          const isDraw = match.result === "Draw";
+                          
+                          return (
+                            <Box
+                              key={index}
+                              p={4}
+                              borderRadius="md"
+                              bg={isWin ? "green.50" : isDraw ? "gray.50" : "red.50"}
+                              border="2px solid"
+                              borderColor={isWin ? "green.200" : isDraw ? "gray.200" : "red.200"}
+                              _hover={{
+                                borderColor: isWin ? "green.400" : isDraw ? "gray.400" : "red.400",
+                                transform: "translateY(-1px)"
+                              }}
+                              transition="all 0.2s ease"
+                            >
+                              <VStack spacing={3}>
+                                {/* Date */}
+                                <Text fontSize="xs" color="gray.500">
+                                  {new Date(match.date).toLocaleDateString()}
+                                </Text>
+                                
+                                {/* Score */}
+                                <Text fontSize="xl" fontWeight="bold" color="gray.800">
+                                  {match.score}
+                                </Text>
+                                
+                                {/* Result */}
+                                <Badge 
+                                  colorScheme={isWin ? "green" : isDraw ? "gray" : "red"}
+                                  variant="solid"
+                                  fontSize="sm"
+                                >
+                                  {match.result}
+                                </Badge>
+                                
+                                {/* Team Color */}
+                                <Text fontSize="sm" color="gray.600">
+                                  Played as {match.teamColor} team
+                                </Text>
+                                
+                                {/* VS */}
+                                <Text fontSize="xs" color="gray.500" fontWeight="bold">VS</Text>
+                                
+                                {/* Opponent */}
+                                <VStack spacing={1}>
+                                  <HStack spacing={2}>
+                                    <Icon as={GiShield} boxSize={3} color="blue.600" />
+                                    <Text fontSize="xs" color="red.700">{match.opponentDefender}</Text>
+                                  </HStack>
+                                  <HStack spacing={2}>
+                                    <Icon as={GiCrossedSwords} boxSize={3} color="orange.600" />
+                                    <Text fontSize="xs" color="red.700">{match.opponentAttacker}</Text>
+                                  </HStack>
+                                </VStack>
+                              </VStack>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    )}
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
             ) : (
-              <Box
-                display="grid"
-                gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }}
-                gap={4}
-                pb={4}
-              >
-                {teamMatchHistory.map((match, index) => {
-                  const isWin = match.result === "Win";
-                  const isDraw = match.result === "Draw";
-                  
-                  return (
-                    <Box
-                      key={index}
-                      p={4}
-                      borderRadius="md"
-                      bg={isWin ? "green.50" : isDraw ? "gray.50" : "red.50"}
-                      border="2px solid"
-                      borderColor={isWin ? "green.200" : isDraw ? "gray.200" : "red.200"}
-                      _hover={{
-                        borderColor: isWin ? "green.400" : isDraw ? "gray.400" : "red.400",
-                        transform: "translateY(-1px)"
-                      }}
-                      transition="all 0.2s ease"
-                    >
-                      <VStack spacing={3}>
-                        {/* Date */}
-                        <Text fontSize="xs" color="gray.500">
-                          {new Date(match.date).toLocaleDateString()}
-                        </Text>
-                        
-                        {/* Score */}
-                        <Text fontSize="xl" fontWeight="bold" color="gray.800">
-                          {match.score}
-                        </Text>
-                        
-                        {/* Result */}
-                        <Badge 
-                          colorScheme={isWin ? "green" : isDraw ? "gray" : "red"}
-                          variant="solid"
-                          fontSize="sm"
-                        >
-                          {match.result}
-                        </Badge>
-                        
-                        {/* Team Color */}
-                        <Text fontSize="sm" color="gray.600">
-                          Played as {match.teamColor} team
-                        </Text>
-                        
-                        {/* VS */}
-                        <Text fontSize="xs" color="gray.500" fontWeight="bold">VS</Text>
-                        
-                        {/* Opponent */}
-                        <Text fontSize="sm" fontWeight="medium" color="red.700" textAlign="center">
-                          {match.opponent}
-                        </Text>
-                      </VStack>
-                    </Box>
-                  );
-                })}
+              <Box textAlign="center" py={10}>
+                <Text color={textColor}>No data available for this team.</Text>
               </Box>
             )}
           </ModalBody>

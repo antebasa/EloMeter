@@ -1024,7 +1024,7 @@ export async function getTeamRankings(): Promise<TeamWithStats[]> {
   }
 }
 
-// Function to get team match history
+// Function to get team match history with enhanced statistics
 export async function getTeamMatchHistory(teamId: number): Promise<any[]> {
   try {
     // Get all matches where this team played
@@ -1097,7 +1097,7 @@ export async function getTeamMatchHistory(teamId: number): Promise<any[]> {
       return acc;
     }, {} as Record<number, string>);
 
-    // Process match history
+    // Process match history with enhanced data
     return matches.map(match => {
       const isWhiteTeam = match.white_team_id === teamId;
       const teamScore = isWhiteTeam ? match.team_white_score : match.team_blue_score;
@@ -1112,10 +1112,12 @@ export async function getTeamMatchHistory(teamId: number): Promise<any[]> {
       // Get opponent team information
       const opponentTeam = teamMap[opponentTeamId];
       let opponentName = 'Unknown Team';
+      let opponentDefender = 'Unknown';
+      let opponentAttacker = 'Unknown';
       if (opponentTeam) {
-        const defenderName = userMap[opponentTeam.player_defense_id] || 'Unknown';
-        const attackerName = userMap[opponentTeam.player_offense_id] || 'Unknown';
-        opponentName = opponentTeam.name || `${defenderName} (D) & ${attackerName} (O)`;
+        opponentDefender = userMap[opponentTeam.player_defense_id] || 'Unknown';
+        opponentAttacker = userMap[opponentTeam.player_offense_id] || 'Unknown';
+        opponentName = opponentTeam.name || `${opponentDefender} (D) & ${opponentAttacker} (O)`;
       }
 
       return {
@@ -1126,11 +1128,114 @@ export async function getTeamMatchHistory(teamId: number): Promise<any[]> {
         teamScore,
         opponentScore,
         opponent: opponentName,
-        teamColor: isWhiteTeam ? 'White' : 'Blue'
+        opponentDefender,
+        opponentAttacker,
+        teamColor: isWhiteTeam ? 'White' : 'Blue',
+        goalDifference: teamScore - opponentScore
       };
     });
   } catch (error) {
     console.error('Error in getTeamMatchHistory:', error);
     return [];
+  }
+}
+
+// Function to get team performance analytics
+export async function getTeamPerformanceAnalytics(teamId: number): Promise<any> {
+  try {
+    const matchHistory = await getTeamMatchHistory(teamId);
+    
+    if (matchHistory.length === 0) {
+      return {
+        totalMatches: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        winPercentage: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDifference: 0,
+        averageGoalsFor: 0,
+        averageGoalsAgainst: 0,
+        whiteTeamRecord: { wins: 0, losses: 0, draws: 0, total: 0 },
+        blueTeamRecord: { wins: 0, losses: 0, draws: 0, total: 0 },
+        recentForm: [],
+        performanceOverTime: []
+      };
+    }
+
+    // Calculate basic statistics
+    const totalMatches = matchHistory.length;
+    const wins = matchHistory.filter(m => m.result === 'Win').length;
+    const losses = matchHistory.filter(m => m.result === 'Loss').length;
+    const draws = matchHistory.filter(m => m.result === 'Draw').length;
+    const winPercentage = Math.round((wins / totalMatches) * 100);
+    
+    const goalsFor = matchHistory.reduce((sum, m) => sum + m.teamScore, 0);
+    const goalsAgainst = matchHistory.reduce((sum, m) => sum + m.opponentScore, 0);
+    const goalDifference = goalsFor - goalsAgainst;
+    const averageGoalsFor = Math.round((goalsFor / totalMatches) * 100) / 100;
+    const averageGoalsAgainst = Math.round((goalsAgainst / totalMatches) * 100) / 100;
+
+    // Team color performance
+    const whiteMatches = matchHistory.filter(m => m.teamColor === 'White');
+    const blueMatches = matchHistory.filter(m => m.teamColor === 'Blue');
+    
+    const whiteTeamRecord = {
+      wins: whiteMatches.filter(m => m.result === 'Win').length,
+      losses: whiteMatches.filter(m => m.result === 'Loss').length,
+      draws: whiteMatches.filter(m => m.result === 'Draw').length,
+      total: whiteMatches.length
+    };
+    
+    const blueTeamRecord = {
+      wins: blueMatches.filter(m => m.result === 'Win').length,
+      losses: blueMatches.filter(m => m.result === 'Loss').length,
+      draws: blueMatches.filter(m => m.result === 'Draw').length,
+      total: blueMatches.length
+    };
+
+    // Recent form (last 10 matches)
+    const recentForm = matchHistory.slice(0, 10).map(m => m.result);
+
+    // Performance over time (for charts)
+    const performanceOverTime = matchHistory
+      .reverse() // Oldest first for chart
+      .map((match, index) => {
+        const matchesUpToNow = matchHistory.slice(0, index + 1);
+        const winsUpToNow = matchesUpToNow.filter(m => m.result === 'Win').length;
+        const winPercentageUpToNow = Math.round((winsUpToNow / (index + 1)) * 100);
+        
+        return {
+          date: match.date,
+          matchNumber: index + 1,
+          winPercentage: winPercentageUpToNow,
+          goalsFor: match.teamScore,
+          goalsAgainst: match.opponentScore,
+          goalDifference: match.goalDifference,
+          result: match.result
+        };
+      });
+
+    return {
+      totalMatches,
+      wins,
+      losses,
+      draws,
+      winPercentage,
+      goalsFor,
+      goalsAgainst,
+      goalDifference,
+      averageGoalsFor,
+      averageGoalsAgainst,
+      whiteTeamRecord,
+      blueTeamRecord,
+      recentForm,
+      performanceOverTime,
+      matchHistory
+    };
+  } catch (error) {
+    console.error('Error in getTeamPerformanceAnalytics:', error);
+    return null;
   }
 }
