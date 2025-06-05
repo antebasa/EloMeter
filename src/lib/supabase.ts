@@ -28,6 +28,7 @@ export interface User {
   elo_offense?: number;
   elo_defense?: number;
   beginner?: boolean;
+  avatar_url?: string; // Avatar URL for user profile picture
 }
 
 // export enum TeamColor { // No longer used directly in Team table for match context
@@ -901,6 +902,8 @@ export interface TeamWithStats {
   player_offense_id: number;
   defender_name: string;
   attacker_name: string;
+  defender_avatar_url?: string;
+  attacker_avatar_url?: string;
   played: number;
   won: number;
   winPercentage: number;
@@ -923,7 +926,7 @@ export async function getTeamRankings(): Promise<TeamWithStats[]> {
       return [];
     }
 
-    // Get all user names for team members
+    // Get all user names and avatar URLs for team members
     const allPlayerIds = new Set<number>();
     teams.forEach(team => {
       allPlayerIds.add(team.player_defense_id);
@@ -932,7 +935,7 @@ export async function getTeamRankings(): Promise<TeamWithStats[]> {
 
     const { data: users, error: usersError } = await supabase
       .from('User')
-      .select('id, name')
+      .select('id, name, avatar_url')
       .in('id', Array.from(allPlayerIds));
 
     if (usersError) {
@@ -941,9 +944,9 @@ export async function getTeamRankings(): Promise<TeamWithStats[]> {
     }
 
     const userMap = users?.reduce((acc, user) => {
-      acc[user.id] = user.name;
+      acc[user.id] = { name: user.name, avatar_url: user.avatar_url };
       return acc;
-    }, {} as Record<number, string>) || {};
+    }, {} as Record<number, { name: string; avatar_url?: string }>) || {};
 
     // Get match statistics for all teams
     const { data: matches, error: matchesError } = await supabase
@@ -987,14 +990,19 @@ export async function getTeamRankings(): Promise<TeamWithStats[]> {
     const teamsWithStats: TeamWithStats[] = teams.map(team => {
       const stats = teamStats.get(team.id) || { played: 0, won: 0 };
       const winPercentage = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
+      
+      const defenderUser = userMap[team.player_defense_id];
+      const attackerUser = userMap[team.player_offense_id];
 
       return {
         id: team.id,
-        name: team.name || `${userMap[team.player_defense_id] || 'Unknown'} (D) & ${userMap[team.player_offense_id] || 'Unknown'} (O)`,
+        name: team.name || `${defenderUser?.name || 'Unknown'} (D) & ${attackerUser?.name || 'Unknown'} (O)`,
         player_defense_id: team.player_defense_id,
         player_offense_id: team.player_offense_id,
-        defender_name: userMap[team.player_defense_id] || 'Unknown',
-        attacker_name: userMap[team.player_offense_id] || 'Unknown',
+        defender_name: defenderUser?.name || 'Unknown',
+        attacker_name: attackerUser?.name || 'Unknown',
+        defender_avatar_url: defenderUser?.avatar_url,
+        attacker_avatar_url: attackerUser?.avatar_url,
         played: stats.played,
         won: stats.won,
         winPercentage,

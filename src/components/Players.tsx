@@ -45,7 +45,6 @@ import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats, getTeamRankings
 
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
-  avatar_url?: string;
   elo_overall?: number;
 }
 
@@ -740,12 +739,22 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
                           <Flex direction="column" gap={1}>
                             <HStack spacing={2}>
                               <Icon as={GiShield} boxSize={4} color="blue.600" />
+                              <Avatar 
+                                size="xs" 
+                                name={team.defender_name} 
+                                src={team.defender_avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${team.defender_avatar_url}` : undefined} 
+                              />
                               <Text fontSize="sm" fontWeight="medium" color="blue.700">
                                 {team.defender_name}
                               </Text>
                             </HStack>
                             <HStack spacing={2}>
                               <Icon as={GiCrossedSwords} boxSize={4} color="orange.600" />
+                              <Avatar 
+                                size="xs" 
+                                name={team.attacker_name} 
+                                src={team.attacker_avatar_url ? `${import.meta.env.VITE_SUPABASE_URL}/${team.attacker_avatar_url}` : undefined} 
+                              />
                               <Text fontSize="sm" fontWeight="medium" color="orange.700">
                                 {team.attacker_name}
                               </Text>
