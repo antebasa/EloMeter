@@ -11,6 +11,7 @@ import {
   Flex,
   Heading,
   HStack,
+  Icon,
   Input,
   InputGroup,
   InputLeftElement,
@@ -38,8 +39,9 @@ import {
   useColorModeValue
 } from "@chakra-ui/react";
 import {SearchIcon} from '@chakra-ui/icons';
-import type {User as SupabaseUser, PlayerMatchStatsQueryResultEntry} from "../lib/supabase";
-import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats} from "../lib/supabase";
+import {GiCrossedSwords, GiShield} from 'react-icons/gi';
+import type {User as SupabaseUser, PlayerMatchStatsQueryResultEntry, TeamWithStats} from "../lib/supabase";
+import {getPlayerMatchHistory, getUsers, getAllPlayerMatchStats, getTeamRankings} from "../lib/supabase";
 
 // Extend SupabaseUser type to include avatar_url if it comes from your DB
 interface User extends SupabaseUser {
@@ -114,6 +116,8 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
 
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [filteredPlayers, setFilteredPlayers] = useState<PlayerWithStats[]>([]);
+  const [teams, setTeams] = useState<TeamWithStats[]>([]);
+  const [filteredTeams, setFilteredTeams] = useState<TeamWithStats[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +125,11 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
     key: keyof PlayerWithStats;
     direction: 'ascending' | 'descending';
   }>({ key: 'elo_offense', direction: 'descending' });
-  const [activeTab, setActiveTab] = useState(0); // 0 for offense, 1 for defense, 2 for overall
+  const [teamSortConfig, setTeamSortConfig] = useState<{
+    key: keyof TeamWithStats;
+    direction: 'ascending' | 'descending';
+  }>({ key: 'winPercentage', direction: 'descending' });
+  const [activeTab, setActiveTab] = useState(0); // 0 for offense, 1 for defense, 2 for overall, 3 for teams
 
   useEffect(() => {
     async function loadUsers() {
@@ -284,17 +292,22 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
           })
         );
 
+        // Load teams data
+        const fetchedTeams = await getTeamRankings();
+
         let sortedPlayersList = [...playersWithAllStats] as PlayerWithStats[];
         if (activeTab === 0) {
           sortedPlayersList.sort((a, b) => (b.elo_offense || 0) - (a.elo_offense || 0));
         } else if (activeTab === 1) {
           sortedPlayersList.sort((a, b) => (b.elo_defense || 0) - (a.elo_defense || 0));
-        } else { // activeTab === 2 for Overall
+        } else if (activeTab === 2) {
           sortedPlayersList.sort((a, b) => (b.elo_overall || 0) - (a.elo_overall || 0));
         }
 
         setPlayers(sortedPlayersList);
         setFilteredPlayers(sortedPlayersList);
+        setTeams(fetchedTeams);
+        setFilteredTeams(fetchedTeams);
       } catch (err) {
         console.error("Error loading users:", err);
         setError("Failed to load players. Please try again later.");
@@ -307,15 +320,56 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
   }, []);
 
   useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredPlayers(players);
+    if (activeTab === 3) {
+      // Filter teams
+      if (searchTerm.trim() === '') {
+        setFilteredTeams(teams);
+      } else {
+        const filtered = teams.filter(team =>
+          team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          team.defender_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          team.attacker_name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredTeams(filtered);
+      }
     } else {
-      const filtered = players.filter(player =>
-        player.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredPlayers(filtered);
+      // Filter players
+      if (searchTerm.trim() === '') {
+        setFilteredPlayers(players);
+      } else {
+        const filtered = players.filter(player =>
+          player.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredPlayers(filtered);
+      }
     }
-  }, [searchTerm, players]);
+  }, [searchTerm, players, teams, activeTab]);
+
+  const handleTeamSort = (key: keyof TeamWithStats) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (teamSortConfig.key === key && teamSortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+
+    setTeamSortConfig({ key, direction });
+
+    const sorted = [...filteredTeams].sort((a, b) => {
+      const aValue = a[key] as any;
+      const bValue = b[key] as any;
+
+      const valA = aValue === null || aValue === undefined ? (direction === 'ascending' ? Infinity : -Infinity) : aValue;
+      const valB = bValue === null || bValue === undefined ? (direction === 'ascending' ? Infinity : -Infinity) : bValue;
+
+      if (valA < valB) {
+        return direction === 'ascending' ? -1 : 1;
+      }
+      if (valA > valB) {
+        return direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
+    setFilteredTeams(sorted);
+  };
 
   const handleSort = (key: keyof PlayerWithStats) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -345,28 +399,52 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
 
   const handleTabChange = (index: number) => {
     setActiveTab(index);
-    const keyToSort: keyof PlayerWithStats = index === 0 ? 'elo_offense' : index === 1 ? 'elo_defense' : 'elo_overall';
-    setSortConfig({ key: keyToSort, direction: 'descending' });
-
-    const sortedPlayersList = [...players].sort((a, b) => {
-        const aValue = a[keyToSort] || 0;
-        const bValue = b[keyToSort] || 0;
-        return bValue - aValue;
-    });
-    setPlayers(sortedPlayersList);
-    if (searchTerm.trim() === '') {
-      setFilteredPlayers(sortedPlayersList);
+    
+    if (index === 3) {
+      // Teams tab - set default team sorting
+      setTeamSortConfig({ key: 'winPercentage', direction: 'descending' });
+      const sortedTeams = [...teams].sort((a, b) => b.winPercentage - a.winPercentage);
+      setTeams(sortedTeams);
+      if (searchTerm.trim() === '') {
+        setFilteredTeams(sortedTeams);
+      } else {
+        const filtered = sortedTeams.filter(team =>
+          team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          team.defender_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          team.attacker_name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredTeams(filtered);
+      }
     } else {
-      const filtered = sortedPlayersList.filter(player =>
-        player.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredPlayers(filtered);
+      // Player tabs
+      const keyToSort: keyof PlayerWithStats = index === 0 ? 'elo_offense' : index === 1 ? 'elo_defense' : 'elo_overall';
+      setSortConfig({ key: keyToSort, direction: 'descending' });
+
+      const sortedPlayersList = [...players].sort((a, b) => {
+          const aValue = a[keyToSort] || 0;
+          const bValue = b[keyToSort] || 0;
+          return bValue - aValue;
+      });
+      setPlayers(sortedPlayersList);
+      if (searchTerm.trim() === '') {
+        setFilteredPlayers(sortedPlayersList);
+      } else {
+        const filtered = sortedPlayersList.filter(player =>
+          player.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredPlayers(filtered);
+      }
     }
   };
 
   const renderSortIcon = (key: keyof PlayerWithStats) => {
     if (sortConfig.key !== key) return null;
     return sortConfig.direction === 'ascending' ? ' ↑' : ' ↓';
+  };
+
+  const renderTeamSortIcon = (key: keyof TeamWithStats) => {
+    if (teamSortConfig.key !== key) return null;
+    return teamSortConfig.direction === 'ascending' ? ' ↑' : ' ↓';
   };
 
   const renderRecentForm = (formDetailed: MatchHistoryDisplayEntry[]) => {
@@ -453,14 +531,14 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
 
   return (
     <Box p={{ base: 2, md: 5 }}>
-      <Heading as="h1" size="xl" mb={6} textAlign="center" color={headingColor}>Player Rankings</Heading>
+      <Heading as="h1" size="xl" mb={6} textAlign="center" color={headingColor}>Rankings</Heading>
 
       <InputGroup mb={6} size={{ base: "md", md: "lg" }}>
         <InputLeftElement pointerEvents="none">
           <SearchIcon color={searchIconColor} />
         </InputLeftElement>
         <Input
-          placeholder="Search players..."
+          placeholder={activeTab === 3 ? "Search teams..." : "Search players..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           borderRadius="full"
@@ -474,6 +552,7 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
           <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor} fontSize={{ base: "sm", md: "md" }}>Offense Rankings</Tab>
           <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor} fontSize={{ base: "sm", md: "md" }}>Defense Rankings</Tab>
           <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor} fontSize={{ base: "sm", md: "md" }}>Overall Rankings</Tab>
+          <Tab fontWeight="semibold" _selected={{ color: selectedTabColor, bg: useColorModeValue('teal.50', 'teal.700') }} color={inactiveTabColor} fontSize={{ base: "sm", md: "md" }}>Teams</Tab>
         </TabList>
 
         <TabPanels>
@@ -635,13 +714,65 @@ export const Players = ({ onPlayerClick }: PlayersProps) => {
               </Table>
             </Box>
           </TabPanel>
+
+          <TabPanel p={0}>
+            <Box overflowX="auto">
+              <Table variant="simple" size={{ base: "sm", md: "md" }} bg={tableBg} boxShadow="md" borderRadius="md">
+                <Thead bg={headerBg}>
+                  <Tr>
+                    <Th cursor="pointer" onClick={() => handleTeamSort('name')}>Team Name{renderTeamSortIcon('name')}</Th>
+                    <Th cursor="pointer" onClick={() => handleTeamSort('played')}>Played{renderTeamSortIcon('played')}</Th>
+                    <Th cursor="pointer" onClick={() => handleTeamSort('won')}>Won{renderTeamSortIcon('won')}</Th>
+                    <Th isNumeric cursor="pointer" onClick={() => handleTeamSort('winPercentage')}>Win %{renderTeamSortIcon('winPercentage')}</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {filteredTeams.map((team, idx) => (
+                    <Tr
+                      key={team.id}
+                      _hover={{ bg: rowHoverBg }}
+                      transition="background-color 0.2s ease-in-out"
+                      backgroundColor={positionColor(idx)}
+                    >
+                      <Td>
+                        <Flex align="center">
+                          <Text mr={'20px'} fontWeight="medium">{idx + 1}.</Text>
+                          <Flex direction="column" gap={1}>
+                            <HStack spacing={2}>
+                              <Icon as={GiShield} boxSize={4} color="blue.600" />
+                              <Text fontSize="sm" fontWeight="medium" color="blue.700">
+                                {team.defender_name}
+                              </Text>
+                            </HStack>
+                            <HStack spacing={2}>
+                              <Icon as={GiCrossedSwords} boxSize={4} color="orange.600" />
+                              <Text fontSize="sm" fontWeight="medium" color="orange.700">
+                                {team.attacker_name}
+                              </Text>
+                            </HStack>
+                          </Flex>
+                        </Flex>
+                      </Td>
+                      <Td>{team.played}</Td>
+                      <Td>{team.won}</Td>
+                      <Td isNumeric>{team.winPercentage}%</Td>
+                    </Tr>
+                  )) as ReactNode}
+                </Tbody>
+              </Table>
+            </Box>
+          </TabPanel>
         </TabPanels>
       </Tabs>
-      {filteredPlayers.length === 0 && !loading && searchTerm && (
-        <Text mt={4} textAlign="center" color={textColor}>No players found for "{searchTerm}".</Text>
+      {((activeTab === 3 && filteredTeams.length === 0) || (activeTab !== 3 && filteredPlayers.length === 0)) && !loading && searchTerm && (
+        <Text mt={4} textAlign="center" color={textColor}>
+          No {activeTab === 3 ? 'teams' : 'players'} found for "{searchTerm}".
+        </Text>
       ) as ReactNode}
-      {filteredPlayers.length === 0 && !loading && !searchTerm && (
-         <Text mt={4} textAlign="center" color={textColor}>No players available. Add some players and matches to get started!</Text>
+      {((activeTab === 3 && filteredTeams.length === 0) || (activeTab !== 3 && filteredPlayers.length === 0)) && !loading && !searchTerm && (
+         <Text mt={4} textAlign="center" color={textColor}>
+          No {activeTab === 3 ? 'teams' : 'players'} available. Add some {activeTab === 3 ? 'teams and' : 'players and'} matches to get started!
+         </Text>
       ) as ReactNode}
     </Box>
   );

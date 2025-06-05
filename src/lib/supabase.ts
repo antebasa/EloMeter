@@ -892,3 +892,126 @@ export async function getHeadToHeadMatches(
     return [];
   }
 }
+
+// Interface for team statistics
+export interface TeamWithStats {
+  id: number;
+  name: string;
+  player_defense_id: number;
+  player_offense_id: number;
+  defender_name: string;
+  attacker_name: string;
+  played: number;
+  won: number;
+  winPercentage: number;
+}
+
+// Function to get team rankings with statistics
+export async function getTeamRankings(): Promise<TeamWithStats[]> {
+  try {
+    // Get all teams with player information
+    const { data: teams, error: teamsError } = await supabase
+      .from('Team')
+      .select('id, name, player_defense_id, player_offense_id');
+
+    if (teamsError) {
+      console.error('Error fetching teams:', teamsError);
+      return [];
+    }
+
+    if (!teams || teams.length === 0) {
+      return [];
+    }
+
+    // Get all user names for team members
+    const allPlayerIds = new Set<number>();
+    teams.forEach(team => {
+      allPlayerIds.add(team.player_defense_id);
+      allPlayerIds.add(team.player_offense_id);
+    });
+
+    const { data: users, error: usersError } = await supabase
+      .from('User')
+      .select('id, name')
+      .in('id', Array.from(allPlayerIds));
+
+    if (usersError) {
+      console.error('Error fetching users for teams:', usersError);
+      return [];
+    }
+
+    const userMap = users?.reduce((acc, user) => {
+      acc[user.id] = user.name;
+      return acc;
+    }, {} as Record<number, string>) || {};
+
+    // Get match statistics for all teams
+    const { data: matches, error: matchesError } = await supabase
+      .from('Match')
+      .select('white_team_id, blue_team_id, team_white_score, team_blue_score');
+
+    if (matchesError) {
+      console.error('Error fetching matches for team stats:', matchesError);
+      return [];
+    }
+
+    // Calculate team statistics
+    const teamStats = new Map<number, { played: number; won: number }>();
+
+    // Initialize all teams
+    teams.forEach(team => {
+      teamStats.set(team.id, { played: 0, won: 0 });
+    });
+
+    // Process matches
+    matches?.forEach(match => {
+      const whiteTeamStats = teamStats.get(match.white_team_id);
+      const blueTeamStats = teamStats.get(match.blue_team_id);
+
+      if (whiteTeamStats) {
+        whiteTeamStats.played++;
+        if (match.team_white_score > match.team_blue_score) {
+          whiteTeamStats.won++;
+        }
+      }
+
+      if (blueTeamStats) {
+        blueTeamStats.played++;
+        if (match.team_blue_score > match.team_white_score) {
+          blueTeamStats.won++;
+        }
+      }
+    });
+
+    // Build the result array
+    const teamsWithStats: TeamWithStats[] = teams.map(team => {
+      const stats = teamStats.get(team.id) || { played: 0, won: 0 };
+      const winPercentage = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
+
+      return {
+        id: team.id,
+        name: team.name || `${userMap[team.player_defense_id] || 'Unknown'} (D) & ${userMap[team.player_offense_id] || 'Unknown'} (O)`,
+        player_defense_id: team.player_defense_id,
+        player_offense_id: team.player_offense_id,
+        defender_name: userMap[team.player_defense_id] || 'Unknown',
+        attacker_name: userMap[team.player_offense_id] || 'Unknown',
+        played: stats.played,
+        won: stats.won,
+        winPercentage,
+      };
+    });
+
+    // Sort by win percentage (descending), then by games played (descending)
+    teamsWithStats.sort((a, b) => {
+      if (b.winPercentage !== a.winPercentage) {
+        return b.winPercentage - a.winPercentage;
+      }
+      return b.played - a.played;
+    });
+
+    return teamsWithStats;
+  } catch (error) {
+    console.error('Error in getTeamRankings:', error);
+    return [];
+  }
+}
