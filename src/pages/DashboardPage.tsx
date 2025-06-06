@@ -51,6 +51,10 @@ const DashboardPage: React.FC = () => {
                 // Navigate to the live match page
                 navigate('/app/live-match');
                 return null;
+            case 'Season':
+                // Navigate to the season page
+                navigate('/app/season');
+                return null;
             case 'History':
                 return <History selectedPlayerIdProp={selectedPlayerIdForHistory} onDoneWithSelectedPlayer={clearSelectedPlayerIdForHistory} />;
             case 'OptimalTeams':

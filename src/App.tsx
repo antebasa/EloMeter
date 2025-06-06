@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage'; // Your main application comp
 import LiveMatchPage from './pages/LiveMatchPage';
 import TeamControlPage from './pages/TeamControlPage';
 import LiveScoreDisplayPage from './pages/LiveScoreDisplayPage';
+import SeasonPage from './pages/SeasonPage';
 
 // A component to handle redirection logic after login/logout
 const AuthRedirector: React.FC = () => {
@@ -42,6 +43,7 @@ function App() {
               <Route path="live-match" element={<LiveMatchPage />} />
               <Route path="live-match/:matchId/display" element={<LiveScoreDisplayPage />} />
               <Route path="live-match/:matchId/:team" element={<TeamControlPage />} />
+              <Route path="season" element={<SeasonPage />} />
               {/* Add other protected routes here as children of ProtectedRoute */}
               {/* e.g. <Route path="settings" element={<SettingsPage />} /> */}
             </Route>
