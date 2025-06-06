@@ -161,9 +161,9 @@ const SeasonFixtures: React.FC = () => {
   const selectedSeason = seasons.find(s => s.id.toString() === selectedSeasonId);
 
   return (
-    <Box p={6}>
-      <VStack spacing={6} align="stretch">
-        <HStack justify="space-between" align="center">
+    <Box h="100%" display="flex" flexDirection="column">
+      <VStack spacing={6} align="stretch" h="100%">
+        <HStack justify="space-between" align="center" flexShrink={0} px={6} pt={6}>
           <Text fontSize="2xl" fontWeight="bold" color="white">
             Season Fixtures
           </Text>
@@ -186,7 +186,7 @@ const SeasonFixtures: React.FC = () => {
         </HStack>
 
         {selectedSeason && (
-          <Box p={4} bg="gray.700" borderRadius="lg">
+          <Box p={4} bg="gray.700" borderRadius="lg" mx={6} flexShrink={0}>
             <Text color="white" fontSize="lg" fontWeight="bold">
               {selectedSeason.name}
             </Text>
@@ -198,93 +198,95 @@ const SeasonFixtures: React.FC = () => {
           </Box>
         )}
 
-        <Divider />
+        <Divider mx={6} flexShrink={0} />
 
-        {loading && (
-          <Text color="white" textAlign="center">Loading fixtures...</Text>
-        )}
+        <Box flex="1" overflowY="auto" px={6} pb={6}>
+          {loading && (
+            <Text color="white" textAlign="center">Loading fixtures...</Text>
+          )}
 
-        {!loading && fixtures.length === 0 && selectedSeasonId && (
-          <Text color="gray.400" textAlign="center">
-            No fixtures found for this season.
-          </Text>
-        )}
+          {!loading && fixtures.length === 0 && selectedSeasonId && (
+            <Text color="gray.400" textAlign="center">
+              No fixtures found for this season.
+            </Text>
+          )}
 
-        {!loading && fixtures.length > 0 && (
-          <VStack spacing={4} align="stretch">
-            {fixtures.map((fixture) => {
-              const isPlayed = getMatchStatus(fixture) === 'played';
-              
-              return (
-                <Box
-                  key={fixture.id}
-                  p={4}
-                  borderWidth={1}
-                  borderRadius="lg"
-                  bg={isPlayed ? "gray.700" : "gray.800"}
-                  borderColor={isPlayed ? "green.500" : "gray.600"}
-                  cursor={user?.user_metadata?.admin ? "pointer" : "default"}
-                  onClick={user?.user_metadata?.admin ? () => handleEditFixture(fixture) : undefined}
-                  _hover={user?.user_metadata?.admin ? { bg: "gray.600" } : {}}
-                >
-                  <Grid templateColumns="1fr auto 1fr" gap={4} alignItems="center">
-                    {/* Home Team (White Side) */}
-                    <GridItem>
-                      <VStack align="end" spacing={1}>
-                        <Text color="white" fontWeight="bold" textAlign="right">
-                          {fixture.home_team?.name || 'Unknown Team'}
-                        </Text>
-                        <Badge colorScheme="blue" size="sm">WHITE SIDE</Badge>
-                      </VStack>
-                    </GridItem>
+          {!loading && fixtures.length > 0 && (
+            <VStack spacing={4} align="stretch">
+              {fixtures.map((fixture) => {
+                const isPlayed = getMatchStatus(fixture) === 'played';
+                
+                return (
+                  <Box
+                    key={fixture.id}
+                    p={4}
+                    borderWidth={1}
+                    borderRadius="lg"
+                    bg={isPlayed ? "gray.700" : "gray.800"}
+                    borderColor={isPlayed ? "green.500" : "gray.600"}
+                    cursor={user?.user_metadata?.admin ? "pointer" : "default"}
+                    onClick={user?.user_metadata?.admin ? () => handleEditFixture(fixture) : undefined}
+                    _hover={user?.user_metadata?.admin ? { bg: "gray.600" } : {}}
+                  >
+                    <Grid templateColumns="1fr auto 1fr" gap={4} alignItems="center">
+                      {/* Home Team (White Side) */}
+                      <GridItem>
+                        <VStack align="end" spacing={1}>
+                          <Text color="white" fontWeight="bold" textAlign="right">
+                            {fixture.home_team?.name || 'Unknown Team'}
+                          </Text>
+                          <Badge colorScheme="blue" size="sm">WHITE SIDE</Badge>
+                        </VStack>
+                      </GridItem>
 
-                    {/* Score */}
-                    <GridItem>
-                      <VStack spacing={1}>
-                        {isPlayed ? (
-                          <>
-                            <HStack spacing={2}>
-                              <Text fontSize="2xl" fontWeight="bold" color="white">
-                                {fixture.home_score}
+                      {/* Score */}
+                      <GridItem>
+                        <VStack spacing={1}>
+                          {isPlayed ? (
+                            <>
+                              <HStack spacing={2}>
+                                <Text fontSize="2xl" fontWeight="bold" color="white">
+                                  {fixture.home_score}
+                                </Text>
+                                <Text fontSize="xl" color="gray.400">-</Text>
+                                <Text fontSize="2xl" fontWeight="bold" color="white">
+                                  {fixture.away_score}
+                                </Text>
+                              </HStack>
+                                                          {fixture.home_score !== null && fixture.away_score !== null && 
+                             getWinnerBadge(fixture.home_score ?? 0, fixture.away_score ?? 0)}
+                              <Text fontSize="xs" color="gray.400">
+                                {fixture.played_at && new Date(fixture.played_at).toLocaleDateString()}
                               </Text>
-                              <Text fontSize="xl" color="gray.400">-</Text>
-                              <Text fontSize="2xl" fontWeight="bold" color="white">
-                                {fixture.away_score}
-                              </Text>
-                            </HStack>
-                            {fixture.home_score !== null && fixture.away_score !== null && 
-                             getWinnerBadge(fixture.home_score, fixture.away_score)}
-                            <Text fontSize="xs" color="gray.400">
-                              {fixture.played_at && new Date(fixture.played_at).toLocaleDateString()}
-                            </Text>
-                          </>
-                        ) : (
-                          <>
-                            <Text color="gray.400" fontSize="lg">VS</Text>
-                            <Badge colorScheme="yellow" size="sm">SCHEDULED</Badge>
-                            {user?.user_metadata?.admin && (
-                              <Text fontSize="xs" color="gray.500">Click to add score</Text>
-                            )}
-                          </>
-                        )}
-                      </VStack>
-                    </GridItem>
+                            </>
+                          ) : (
+                            <>
+                              <Text color="gray.400" fontSize="lg">VS</Text>
+                              <Badge colorScheme="yellow" size="sm">SCHEDULED</Badge>
+                              {user?.user_metadata?.admin && (
+                                <Text fontSize="xs" color="gray.500">Click to add score</Text>
+                              )}
+                            </>
+                          )}
+                        </VStack>
+                      </GridItem>
 
-                    {/* Away Team (Blue Side) */}
-                    <GridItem>
-                      <VStack align="start" spacing={1}>
-                        <Text color="white" fontWeight="bold" textAlign="left">
-                          {fixture.away_team?.name || 'Unknown Team'}
-                        </Text>
-                        <Badge colorScheme="red" size="sm">BLUE SIDE</Badge>
-                      </VStack>
-                    </GridItem>
-                  </Grid>
-                </Box>
-              );
-            })}
-          </VStack>
-        )}
+                      {/* Away Team (Blue Side) */}
+                      <GridItem>
+                        <VStack align="start" spacing={1}>
+                          <Text color="white" fontWeight="bold" textAlign="left">
+                            {fixture.away_team?.name || 'Unknown Team'}
+                          </Text>
+                          <Badge colorScheme="red" size="sm">BLUE SIDE</Badge>
+                        </VStack>
+                      </GridItem>
+                    </Grid>
+                  </Box>
+                );
+              })}
+            </VStack>
+          )}
+        </Box>
       </VStack>
 
       {/* Score Edit Modal */}

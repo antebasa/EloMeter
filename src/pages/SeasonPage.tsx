@@ -19,9 +19,9 @@ const SeasonPage: React.FC = () => {
   const [tabIndex, setTabIndex] = useState(0);
 
   return (
-    <Box>
-      <VStack spacing={6} align="stretch">
-        <Box textAlign="center">
+    <Box h="100%" display="flex" flexDirection="column">
+      <VStack spacing={6} align="stretch" flex="1" h="100%">
+        <Box textAlign="center" flexShrink={0}>
           <Text fontSize="3xl" fontWeight="bold" color="white" mb={2}>
             🏆 Season League
           </Text>
@@ -35,8 +35,12 @@ const SeasonPage: React.FC = () => {
           onChange={(index) => setTabIndex(index)}
           variant="enclosed"
           colorScheme="blue"
+          display="flex"
+          flexDirection="column"
+          flex="1"
+          h="100%"
         >
-          <TabList bg="gray.700" borderRadius="lg" p={1}>
+          <TabList bg="gray.700" borderRadius="lg" p={1} flexShrink={0}>
             <Tab 
               color="gray.300" 
               _selected={{ color: "white", bg: "blue.600" }}
@@ -62,17 +66,17 @@ const SeasonPage: React.FC = () => {
             )}
           </TabList>
 
-          <TabPanels>
-            <TabPanel p={0}>
+          <TabPanels flex="1" h="100%">
+            <TabPanel p={0} h="100%">
               <SeasonTable />
             </TabPanel>
             
-            <TabPanel p={0}>
+            <TabPanel p={0} h="100%">
               <SeasonFixtures />
             </TabPanel>
             
             {user?.user_metadata?.admin && (
-              <TabPanel p={0}>
+              <TabPanel p={0} h="100%">
                 <SeasonManagement />
               </TabPanel>
             )}

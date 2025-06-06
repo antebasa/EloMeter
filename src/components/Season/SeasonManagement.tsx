@@ -340,10 +340,10 @@ const SeasonManagement: React.FC = () => {
     }
   };
 
-  return (
-    <Box p={6}>
-      <VStack spacing={6} align="stretch">
-        <HStack justify="space-between">
+    return (
+    <Box h="100%" display="flex" flexDirection="column">
+      <VStack spacing={6} align="stretch" h="100%">
+        <HStack justify="space-between" flexShrink={0} px={6} pt={6}>
           <Text fontSize="2xl" fontWeight="bold" color="white">
             Season Management
           </Text>
@@ -352,67 +352,70 @@ const SeasonManagement: React.FC = () => {
           </Button>
         </HStack>
 
-        <Divider />
+        <Divider mx={6} flexShrink={0} />
 
         {/* Seasons List */}
-        <VStack spacing={4} align="stretch">
-          {seasons.map((season) => (
-            <Box
-              key={season.id}
-              p={4}
-              borderWidth={1}
-              borderRadius="lg"
-              bg="gray.700"
-              borderColor="gray.600"
-            >
-              <HStack justify="space-between" align="start">
-                <VStack align="start" spacing={2}>
-                  <HStack>
-                    <Text fontSize="lg" fontWeight="bold" color="white">
-                      {season.name}
+        <Box flex="1" overflowY="auto" px={6} pb={6}>
+          <VStack spacing={4} align="stretch">
+            {seasons.map((season) => (
+              <Box
+                key={season.id}
+                p={4}
+                borderWidth={1}
+                borderRadius="lg"
+                bg="gray.700"
+                borderColor="gray.600"
+              >
+                <HStack justify="space-between" align="start">
+                  <VStack align="start" spacing={2}>
+                    <HStack>
+                      <Text fontSize="lg" fontWeight="bold" color="white">
+                        {season.name}
+                      </Text>
+                      <Badge colorScheme={getStatusColor(season.status)}>
+                        {season.status}
+                      </Badge>
+                    </HStack>
+                    <Text color="gray.300" fontSize="sm">
+                      Started: {new Date(season.start_date).toLocaleDateString()}
+                      {season.end_date && ` • Ended: ${new Date(season.end_date).toLocaleDateString()}`}
                     </Text>
-                    <Badge colorScheme={getStatusColor(season.status)}>
-                      {season.status}
-                    </Badge>
+                  </VStack>
+                  
+                  <HStack>
+                    <Select
+                      value={season.status}
+                      onChange={(e) => handleStatusChange(season, e.target.value as any)}
+                      size="sm"
+                      bg="gray.600"
+                      color="white"
+                      borderColor="gray.500"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                    </Select>
+                    <IconButton
+                      aria-label="Edit season"
+                      icon={<EditIcon />}
+                      size="sm"
+                      onClick={() => handleEditSeason(season)}
+                    />
+                    <IconButton
+                      aria-label="Delete season"
+                      icon={<DeleteIcon />}
+                      size="sm"
+                      colorScheme="red"
+                      onClick={() => handleDeleteSeason(season)}
+                    />
                   </HStack>
-                  <Text color="gray.300" fontSize="sm">
-                    Started: {new Date(season.start_date).toLocaleDateString()}
-                    {season.end_date && ` • Ended: ${new Date(season.end_date).toLocaleDateString()}`}
-                  </Text>
-                </VStack>
-                
-                <HStack>
-                  <Select
-                    value={season.status}
-                    onChange={(e) => handleStatusChange(season, e.target.value as any)}
-                    size="sm"
-                    bg="gray.600"
-                    color="white"
-                    borderColor="gray.500"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                  </Select>
-                  <IconButton
-                    aria-label="Edit season"
-                    icon={<EditIcon />}
-                    size="sm"
-                    onClick={() => handleEditSeason(season)}
-                  />
-                  <IconButton
-                    aria-label="Delete season"
-                    icon={<DeleteIcon />}
-                    size="sm"
-                    colorScheme="red"
-                    onClick={() => handleDeleteSeason(season)}
-                  />
                 </HStack>
-              </HStack>
-            </Box>
-          ))}
-        </VStack>
+              </Box>
+            ))}
+          </VStack>
+        </Box>
       </VStack>
+    </Box>
 
       {/* Create Season Modal */}
       <Modal isOpen={isCreateOpen} onClose={onCreateClose} size="2xl">
