@@ -48,12 +48,28 @@ Check that these tables exist in your Supabase database:
 2. Click **Create New Season**
 3. Enter season name (e.g., "Season 1 - January 2024")
 4. Select start date
-5. Choose teams (minimum 2 required)
+5. Choose team selection method:
+
+**📋 Manual Team Selection**
+- Manually select existing teams from checkboxes
+- View team statistics (matches played, win rate)
+
+**🎲 Random Team Selection**
+- Choose number of teams (2-8)
+- Click "Randomly Select Teams" 
+- System picks teams randomly from available pool
+
+**👥 Player-Based Selection**
+- Select individual players (even number, minimum 4)
+- Click "Generate Teams from Players"
+- System randomly pairs players into Defense/Offense teams
+- New teams are automatically created
+
 6. Click **Create Season**
 
 **System automatically:**
 - Generates all round-robin fixtures
-- Creates home/away matches for each team pair
+- Creates home/away matches for each team pair  
 - Sets season status to "draft"
 
 #### 2. Manage Season Status
@@ -85,11 +101,13 @@ Check that these tables exist in your Supabase database:
 ## UI Components
 
 ### 📱 **Season Management** (Admin Only)
-- Create new seasons
-- Select participating teams
+- Create new seasons with 3 selection methods:
+  - **Manual**: Choose specific teams
+  - **Random**: Randomly select from existing teams  
+  - **Players**: Select players and auto-generate teams
 - Change season status
 - Delete seasons
-- Manual team adjustments
+- View existing teams and their statistics
 
 ### 🗓️ **Season Fixtures**
 - View all matches for selected season
