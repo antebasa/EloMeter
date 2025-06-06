@@ -27,7 +27,12 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
-  IconButton
+  IconButton,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper
 } from '@chakra-ui/react';
 import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
 import {
@@ -39,19 +44,25 @@ import {
   getSeasonTeams,
   removeTeamFromSeason,
   deleteSeason,
+  createTeamsFromPlayersAndAddToSeason,
   type Season
 } from '../../lib/seasonSupabase';
-import { getTeamRankings, type TeamWithStats } from '../../lib/supabase';
+import { getTeamRankings, getUsers, type TeamWithStats, type User } from '../../lib/supabase';
 
 const SeasonManagement: React.FC = () => {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [teams, setTeams] = useState<TeamWithStats[]>([]);
+  const [players, setPlayers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [newSeasonName, setNewSeasonName] = useState('');
   const [newSeasonDate, setNewSeasonDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingSeason, setEditingSeason] = useState<Season | null>(null);
   const [seasonToDelete, setSeasonToDelete] = useState<Season | null>(null);
+  const [selectionMode, setSelectionMode] = useState<'manual' | 'random' | 'players'>('manual');
+  const [teamCount, setTeamCount] = useState<number>(4);
+  const [createdTeamsFromPlayers, setCreatedTeamsFromPlayers] = useState<Array<{defense: User, offense: User}>>([]);
   
   const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
@@ -66,12 +77,15 @@ const SeasonManagement: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [seasonsData, teamsData] = await Promise.all([
+      const [seasonsData, teamsData, playersData] = await Promise.all([
         getSeasons(),
-        getTeamRankings()
+        getTeamRankings(),
+        getUsers()
       ]);
       setSeasons(seasonsData);
       setTeams(teamsData);
+      setPlayers(playersData);
+      console.log('Loaded players:', playersData.length, playersData);
     } catch (error) {
       toast({
         title: 'Error loading data',
@@ -82,6 +96,69 @@ const SeasonManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRandomTeamSelection = () => {
+    if (teams.length < teamCount) {
+      toast({
+        title: 'Not enough teams',
+        description: `Need at least ${teamCount} teams for random selection`,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const shuffled = [...teams].sort(() => 0.5 - Math.random());
+    const randomTeams = shuffled.slice(0, teamCount).map(team => team.id.toString());
+    setSelectedTeams(randomTeams);
+    
+    toast({
+      title: 'Teams randomly selected!',
+      description: `Selected ${teamCount} random teams`,
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
+  const handleGenerateTeamsFromPlayers = () => {
+    if (selectedPlayers.length < 4 || selectedPlayers.length % 2 !== 0) {
+      toast({
+        title: 'Invalid player count',
+        description: 'Please select an even number of players (minimum 4)',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const playerObjects = selectedPlayers.map(id => 
+      players.find(p => p.id.toString() === id)!
+    );
+
+    // Shuffle players and pair them
+    const shuffled = [...playerObjects].sort(() => 0.5 - Math.random());
+    const newTeams: Array<{defense: User, offense: User}> = [];
+    
+    for (let i = 0; i < shuffled.length; i += 2) {
+      newTeams.push({
+        defense: shuffled[i],
+        offense: shuffled[i + 1]
+      });
+    }
+
+    setCreatedTeamsFromPlayers(newTeams);
+    
+    toast({
+      title: 'Teams generated!',
+      description: `Created ${newTeams.length} teams from selected players`,
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
   };
 
   const handleCreateSeason = async () => {
@@ -95,28 +172,52 @@ const SeasonManagement: React.FC = () => {
       return;
     }
 
-    if (selectedTeams.length < 2) {
-      toast({
-        title: 'Select at least 2 teams',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
+    // Validation based on selection mode
+    if (selectionMode === 'players') {
+      if (createdTeamsFromPlayers.length < 2) {
+        toast({
+          title: 'Generate teams first',
+          description: 'Please generate teams from selected players',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+    } else {
+      if (selectedTeams.length < 2) {
+        toast({
+          title: 'Select at least 2 teams',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
     }
 
     setLoading(true);
     try {
       const season = await createSeason(newSeasonName, newSeasonDate);
       if (season) {
-        const teamIds = selectedTeams.map(id => parseInt(id));
-        const success = await addTeamsToSeason(season.id, teamIds);
+        let success = false;
+        
+        if (selectionMode === 'players') {
+          // Create teams from players and add to season
+          success = await createTeamsFromPlayersAndAddToSeason(season.id, createdTeamsFromPlayers);
+        } else {
+          // Add existing teams to season
+          const teamIds = selectedTeams.map(id => parseInt(id));
+          success = await addTeamsToSeason(season.id, teamIds);
+        }
         
         if (success) {
           await generateFixtures(season.id);
           toast({
             title: 'Season created successfully',
-            description: 'Teams added and fixtures generated',
+            description: selectionMode === 'players' 
+              ? 'Teams created from players and fixtures generated'
+              : 'Teams added and fixtures generated',
             status: 'success',
             duration: 3000,
             isClosable: true,
@@ -125,12 +226,15 @@ const SeasonManagement: React.FC = () => {
           // Reset form
           setNewSeasonName('');
           setSelectedTeams([]);
+          setSelectedPlayers([]);
+          setCreatedTeamsFromPlayers([]);
+          setSelectionMode('manual');
           setNewSeasonDate(new Date().toISOString().split('T')[0]);
           onCreateClose();
           loadData();
         } else {
           toast({
-            title: 'Error adding teams to season',
+            title: 'Error setting up season teams',
             status: 'error',
             duration: 3000,
             isClosable: true,
@@ -311,7 +415,7 @@ const SeasonManagement: React.FC = () => {
       </VStack>
 
       {/* Create Season Modal */}
-      <Modal isOpen={isCreateOpen} onClose={onCreateClose} size="xl">
+      <Modal isOpen={isCreateOpen} onClose={onCreateClose} size="2xl">
         <ModalOverlay />
         <ModalContent bg="gray.800" color="white">
           <ModalHeader>Create New Season</ModalHeader>
@@ -334,20 +438,159 @@ const SeasonManagement: React.FC = () => {
                 borderColor="gray.600"
               />
 
+              {/* Selection Mode */}
               <Box w="full">
-                <Text mb={2} fontWeight="bold">Select Teams (minimum 2):</Text>
-                <CheckboxGroup value={selectedTeams} onChange={(values) => setSelectedTeams(values as string[])}>
-                  <Stack spacing={2} maxH="300px" overflowY="auto">
-                    {teams.map((team) => (
-                      <Checkbox key={team.id} value={team.id.toString()}>
-                        <Text fontSize="sm">
-                          {team.name} ({team.played} matches, {team.winPercentage.toFixed(1)}% win rate)
-                        </Text>
-                      </Checkbox>
-                    ))}
-                  </Stack>
-                </CheckboxGroup>
+                <Text mb={2} fontWeight="bold" color="white">Team Selection Method:</Text>
+                <Select
+                  value={selectionMode}
+                  onChange={(e) => {
+                    setSelectionMode(e.target.value as 'manual' | 'random' | 'players');
+                    setSelectedTeams([]);
+                    setSelectedPlayers([]);
+                    setCreatedTeamsFromPlayers([]);
+                  }}
+                  bg="gray.700"
+                  borderColor="gray.600"
+                  color="white"
+                  sx={{
+                    option: {
+                      bg: 'gray.700',
+                      color: 'white',
+                      _hover: {
+                        bg: 'gray.600'
+                      }
+                    }
+                  }}
+                >
+                  <option style={{ backgroundColor: '#2D3748', color: 'white' }} value="manual">📋 Manual Team Selection</option>
+                  <option style={{ backgroundColor: '#2D3748', color: 'white' }} value="random">🎲 Random Team Selection</option>
+                  <option style={{ backgroundColor: '#2D3748', color: 'white' }} value="players">👥 Select Players & Create Teams</option>
+                </Select>
               </Box>
+
+              {/* Manual Team Selection */}
+              {selectionMode === 'manual' && (
+                <Box w="full">
+                  <Text mb={2} fontWeight="bold" color="white">Select Teams (minimum 2):</Text>
+                  <CheckboxGroup value={selectedTeams} onChange={(values) => setSelectedTeams(values as string[])}>
+                    <Stack spacing={2} maxH="300px" overflowY="auto">
+                      {teams.map((team) => (
+                        <Checkbox key={team.id} value={team.id.toString()}>
+                          <Text fontSize="sm" color="white">
+                            {team.name} ({team.played} matches, {team.winPercentage.toFixed(1)}% win rate)
+                          </Text>
+                        </Checkbox>
+                      ))}
+                    </Stack>
+                  </CheckboxGroup>
+                </Box>
+              )}
+
+              {/* Random Team Selection */}
+              {selectionMode === 'random' && (
+                <Box w="full">
+                  <VStack spacing={3}>
+                    <HStack w="full">
+                      <Text fontWeight="bold" color="white">Number of teams:</Text>
+                      <Select
+                        value={teamCount}
+                        onChange={(e) => setTeamCount(parseInt(e.target.value))}
+                        w="100px"
+                        bg="gray.700"
+                        borderColor="gray.600"
+                        color="white"
+                        sx={{
+                          option: {
+                            bg: 'gray.700',
+                            color: 'white'
+                          }
+                        }}
+                      >
+                        {[2, 3, 4, 5, 6, 7, 8].map(num => (
+                          <option key={num} value={num} style={{ backgroundColor: '#2D3748', color: 'white' }}>{num}</option>
+                        ))}
+                      </Select>
+                    </HStack>
+                    <Button 
+                      colorScheme="green" 
+                      onClick={handleRandomTeamSelection}
+                      w="full"
+                      isDisabled={teams.length < teamCount}
+                    >
+                      🎲 Randomly Select {teamCount} Teams
+                    </Button>
+                    {selectedTeams.length > 0 && (
+                      <Box w="full">
+                        <Text fontSize="sm" fontWeight="bold" mb={2} color="white">Selected Teams:</Text>
+                        <Stack spacing={1}>
+                          {selectedTeams.map(teamId => {
+                            const team = teams.find(t => t.id.toString() === teamId);
+                            return team ? (
+                              <Text key={teamId} fontSize="sm" color="green.400">
+                                ✓ {team.name}
+                              </Text>
+                            ) : null;
+                          })}
+                        </Stack>
+                      </Box>
+                    )}
+                  </VStack>
+                </Box>
+              )}
+
+              {/* Player Selection & Team Creation */}
+              {selectionMode === 'players' && (
+                <Box w="full">
+                  <VStack spacing={3}>
+                    <Text fontWeight="bold" color="white">Select Players (even number, minimum 4):</Text>
+                    
+                    {/* Debug info */}
+                    <Text fontSize="xs" color="gray.400">
+                      Available players: {players.length} | Selected: {selectedPlayers.length}
+                    </Text>
+                    
+                    {players.length === 0 ? (
+                      <Text color="red.400" fontSize="sm">No players found. Loading...</Text>
+                    ) : (
+                      <CheckboxGroup value={selectedPlayers} onChange={(values) => setSelectedPlayers(values as string[])}>
+                        <Stack spacing={2} maxH="200px" overflowY="auto" w="full" bg="gray.700" p={2} borderRadius="md">
+                          {players.map((player) => (
+                            <Checkbox key={player.id} value={player.id.toString()} colorScheme="blue">
+                              <Text fontSize="sm" color="white">
+                                {player.name} (ELO: {player.elo_defense || 1400}D / {player.elo_offense || 1400}O)
+                              </Text>
+                            </Checkbox>
+                          ))}
+                        </Stack>
+                      </CheckboxGroup>
+                    )}
+                    
+                    <Button 
+                      colorScheme="purple" 
+                      onClick={handleGenerateTeamsFromPlayers}
+                      w="full"
+                      isDisabled={selectedPlayers.length < 4 || selectedPlayers.length % 2 !== 0}
+                    >
+                      🔀 Generate Teams from {selectedPlayers.length} Players
+                    </Button>
+
+                    {createdTeamsFromPlayers.length > 0 && (
+                      <Box w="full">
+                        <Text fontSize="sm" fontWeight="bold" mb={2} color="white">Generated Teams:</Text>
+                        <Stack spacing={2}>
+                          {createdTeamsFromPlayers.map((team, index) => (
+                            <Box key={index} p={2} bg="gray.600" borderRadius="md">
+                              <Text fontSize="sm" color="blue.300">
+                                Team {index + 1}: {team.defense.name} (Defense) & {team.offense.name} (Offense)
+                              </Text>
+                            </Box>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+                  </VStack>
+                </Box>
+              )}
             </VStack>
           </ModalBody>
 
@@ -359,7 +602,11 @@ const SeasonManagement: React.FC = () => {
               colorScheme="blue" 
               onClick={handleCreateSeason}
               isLoading={loading}
-              isDisabled={!newSeasonName.trim() || selectedTeams.length < 2}
+              isDisabled={
+                !newSeasonName.trim() || 
+                (selectionMode === 'players' && createdTeamsFromPlayers.length < 2) ||
+                (selectionMode !== 'players' && selectedTeams.length < 2)
+              }
             >
               Create Season
             </Button>

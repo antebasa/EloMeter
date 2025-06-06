@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import type { TeamWithStats } from './supabase';
+import type { TeamWithStats, User } from './supabase';
 
 // Season interfaces
 export interface Season {
@@ -379,4 +379,50 @@ export async function deleteSeason(seasonId: number): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+// Create teams from players and add them to season
+export async function createTeamsFromPlayersAndAddToSeason(
+  seasonId: number, 
+  teamPairs: Array<{defense: User, offense: User}>
+): Promise<boolean> {
+  try {
+    const teamInserts = teamPairs.map(pair => ({
+      player_defense_id: pair.defense.id,
+      player_offense_id: pair.offense.id,
+      name: `${pair.defense.name} (D) & ${pair.offense.name} (O)`,
+      created_at: new Date().toISOString().split('T')[0]
+    }));
+
+    // Insert teams
+    const { data: createdTeams, error: teamError } = await supabase
+      .from('Team')
+      .insert(teamInserts)
+      .select('id');
+
+    if (teamError || !createdTeams) {
+      console.error('Error creating teams:', teamError);
+      return false;
+    }
+
+    // Add teams to season
+    const seasonTeams = createdTeams.map(team => ({
+      season_id: seasonId,
+      team_id: team.id
+    }));
+
+    const { error: seasonTeamError } = await supabase
+      .from('season_teams')
+      .insert(seasonTeams);
+
+    if (seasonTeamError) {
+      console.error('Error adding teams to season:', seasonTeamError);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in createTeamsFromPlayersAndAddToSeason:', error);
+    return false;
+  }
 } 
